@@ -13,7 +13,7 @@ from sklearn.metrics import (
 )
 
 
-PROCESSED_DIR = Path("data/processed")
+PROCESSED_DIR = Path("data/processed_type") # classification
 MODEL_DIR = Path("models")
 REPORT_DIR = Path("reports/lightgbm")
 
@@ -158,9 +158,5 @@ def run_training_pipeline():
     save_feature_importance(model, X_train.columns, REPORT_DIR)
 
 
-def main():
-    run_training_pipeline()
-
-
 if __name__ == "__main__":
-    main()
+    run_training_pipeline()
