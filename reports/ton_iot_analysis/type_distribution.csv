@@ -1,0 +1,11 @@
+type,count
+normal,50000
+backdoor,20000
+ddos,20000
+dos,20000
+injection,20000
+password,20000
+ransomware,20000
+scanning,20000
+xss,20000
+mitm,1043

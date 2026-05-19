@@ -1,0 +1,10 @@
+service,count
+-,132032
+dns,39446
+http,37029
+ftp,1065
+ssl,1025
+gssapi,184
+dce_rpc,136
+smb,108
+smb;gssapi,18
