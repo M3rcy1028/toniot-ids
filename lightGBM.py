@@ -41,12 +41,13 @@ def create_lightgbm_model(num_classes: int) -> lgb.LGBMClassifier:
         n_estimators=500,
         learning_rate=0.05,
         num_leaves=31,
-        max_depth=-1,
+        max_depth=15,
         subsample=0.8,
         colsample_bytree=0.8,
         random_state=RANDOM_STATE,
         n_jobs=-1,
         class_weight="balanced",
+        verbose=-1,
     )
     return model
 
@@ -88,7 +89,7 @@ def evaluate_model(model, X_test, y_test):
         ),
     }
 
-    report = classification_report(y_test, y_pred)
+    report = classification_report(y_test, y_pred, digits=4)
     cm = confusion_matrix(y_test, y_pred)
 
     print("\n========== Evaluation Results ==========")
@@ -108,9 +109,16 @@ def save_model(model, model_dir: Path):
     model_dir.mkdir(parents=True, exist_ok=True)
 
     model_path = model_dir / "lightgbm_toniot_classification.pkl"
+
     joblib.dump(model, model_path)
 
+    # model size
+    model_size_bytes = model_path.stat().st_size
+    model_size_kb = model_size_bytes / 1024
+    model_size_mb = model_size_kb / 1024
+
     print(f"[INFO] Model saved to: {model_path}")
+    print(f"[INFO] Model size: {model_size_kb:.2f} KB ({model_size_mb:.2f} MB)")
 
 
 def save_reports(metrics, report, cm, y_pred, y_prob, report_dir: Path):
