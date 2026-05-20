@@ -1,12 +1,12 @@
 feature,importance
 duration,38518
-src_ip_bytes,22121
+src_ip_bytes,22120
 dst_ip_bytes,14115
 dst_bytes,11716
 src_bytes,11154
 dns_query,10045
 conn_state,9869
-src_pkts,8415
+src_pkts,8416
 dst_pkts,6486
 service,2280
 proto,2181
@@ -15,8 +15,8 @@ dns_rcode,947
 missed_bytes,928
 dns_RA,644
 dns_rejected,545
-dns_RD,477
-dns_AA,471
+dns_RD,478
+dns_AA,470
 http_status_code,242
 dns_qclass,134
 http_response_body_len,57

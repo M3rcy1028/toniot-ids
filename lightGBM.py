@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import joblib
 import lightgbm as lgb
 import pandas as pd
@@ -12,13 +11,14 @@ from sklearn.metrics import (
     recall_score,
 )
 
+import matplotlib.pyplot as plt
+import numpy as np
 
 PROCESSED_DIR = Path("data/processed_type") # classification
 MODEL_DIR = Path("models")
 REPORT_DIR = Path("reports/lightgbm")
 
 RANDOM_STATE = 42
-
 
 def load_processed_data(processed_dir: Path):
     X_train = pd.read_csv(processed_dir / "X_train.csv")
@@ -144,8 +144,50 @@ def save_feature_importance(model, feature_names, report_dir: Path):
 
     print(f"[INFO] Feature importance saved to: {report_dir / 'feature_importance.csv'}")
 
+def save_confusion_matrix_plot(cm, class_names, report_dir: Path):
+    report_dir.mkdir(parents=True, exist_ok=True)
 
-def run_training_pipeline():
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # white → blue colormap
+    im = ax.imshow(cm, cmap="Blues")
+
+    ax.set_title("Confusion Matrix")
+    ax.set_xlabel("Predicted Label")
+    ax.set_ylabel("True Label")
+
+    ax.set_xticks(np.arange(len(class_names)))
+    ax.set_yticks(np.arange(len(class_names)))
+
+    ax.set_xticklabels(class_names, rotation=45, ha="right")
+    ax.set_yticklabels(class_names)
+
+    threshold = cm.max() / 2
+
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            text_color = "white" if cm[i, j] > threshold else "black"
+
+            ax.text(
+                j,
+                i,
+                f"{cm[i, j]:,}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color=text_color,
+            )
+
+    fig.colorbar(im, ax=ax)
+    fig.tight_layout()
+
+    output_path = report_dir / "confusion_matrix.png"
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+
+    print(f"[INFO] Confusion matrix plot saved to: {output_path}")
+
+def run_lightgbm_pipeline():
     X_train, X_test, y_train, y_test = load_processed_data(PROCESSED_DIR)
 
     model = create_lightgbm_model(10)
@@ -153,10 +195,21 @@ def run_training_pipeline():
 
     metrics, report, cm, y_pred, y_prob = evaluate_model(model, X_test, y_test)
 
+    class_names = [
+        "backdoor",
+        "ddos",
+        "dos",
+        "injection",
+        "mitm",
+        "normal",
+        "password",
+        "ransomware",
+        "scanning",
+        "xss",
+    ]
+
+    save_confusion_matrix_plot(cm, class_names, REPORT_DIR)
+
     save_model(model, MODEL_DIR)
     save_reports(metrics, report, cm, y_pred, y_prob, REPORT_DIR)
     save_feature_importance(model, X_train.columns, REPORT_DIR)
-
-
-if __name__ == "__main__":
-    run_training_pipeline()
