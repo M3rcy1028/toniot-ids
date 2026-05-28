@@ -1,7 +1,12 @@
 from pathlib import Path
+import time
+
 import joblib
-import lightgbm as lgb
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+
+from collections import defaultdict
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -11,8 +16,8 @@ from sklearn.metrics import (
     recall_score,
 )
 
-import matplotlib.pyplot as plt
-import numpy as np
+from lightgbm_model import create_lightgbm_model, train_model, save_model
+
 
 PROCESSED_DIR = Path("data/processed_type") # classification
 MODEL_DIR = Path("models")
@@ -33,60 +38,55 @@ def load_processed_data(processed_dir: Path):
     return X_train, X_test, y_train, y_test
 
 
-def create_lightgbm_model(num_classes: int) -> lgb.LGBMClassifier:
-    model = lgb.LGBMClassifier(
-        objective="multiclass",
-        num_class=num_classes,
-        boosting_type="gbdt",
-        n_estimators=500,
-        learning_rate=0.05,
-        num_leaves=31,
-        max_depth=15,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-        class_weight="balanced",
-        verbose=-1,
-    )
-    return model
+def evaluate_classwise_inference_time(model, X_test, y_test):
+    results = []
 
+    for class_id in sorted(y_test.unique()):
+        class_indices = y_test[y_test == class_id].index
+        X_class = X_test.loc[class_indices]
 
-def train_model(model, X_train, y_train):
-    print("[INFO] Training LightGBM model...")
+        start_time = time.perf_counter()
+        _ = model.predict(X_class)
+        end_time = time.perf_counter()
 
-    model.fit(
-        X_train,
-        y_train,
-        eval_set=[(X_train, y_train)],
-        eval_metric="binary_logloss",
-    )
+        total_time = end_time - start_time
+        avg_time_ms = (total_time / len(X_class)) * 1000
 
-    print("[INFO] Training complete")
-    return model
+        results.append({
+            "class_id": class_id,
+            "samples": len(X_class),
+            "total_inference_time_sec": total_time,
+            "avg_inference_time_ms": avg_time_ms,
+        })
 
+    classwise_df = pd.DataFrame(results)
+
+    print("\n========== Class-wise Inference Time ==========")
+    print(classwise_df)
+
+    return classwise_df
 
 def evaluate_model(model, X_test, y_test):
+    # Batch Inference (normal + anomalous)
+    start_time = time.perf_counter()
+
     y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
+    y_prob = model.predict_proba(X_test)
+
+    end_time = time.perf_counter()
+
+    total_inference_time = end_time - start_time
+    avg_inference_time_ms = (total_inference_time / len(X_test)) * 1000
+    throughput = len(X_test) / total_inference_time
 
     metrics = {
         "accuracy": accuracy_score(y_test, y_pred),
-        "precision_macro": precision_score(
-            y_test,
-            y_pred,
-            average="macro"
-        ),
-        "recall_macro": recall_score(
-            y_test,
-            y_pred,
-            average="macro"
-        ),
-        "f1_macro": f1_score(
-            y_test,
-            y_pred,
-            average="macro"
-        ),
+        "precision_macro": precision_score(y_test, y_pred, average="macro"),
+        "recall_macro": recall_score(y_test, y_pred, average="macro"),
+        "f1_macro": f1_score(y_test, y_pred, average="macro"),
+        "total_inference_time_sec": total_inference_time,
+        "avg_inference_time_ms": avg_inference_time_ms,
+        "throughput_samples_per_sec": throughput,
     }
 
     report = classification_report(y_test, y_pred, digits=4)
@@ -102,26 +102,18 @@ def evaluate_model(model, X_test, y_test):
     print("\n========== Confusion Matrix ==========")
     print(cm)
 
-    return metrics, report, cm, y_pred, y_prob
+    print("\n========== Batch Inference Time ==========")
+    print(f"Total inference time: {total_inference_time:.6f} sec")
+    print(f"Average inference time: {avg_inference_time_ms:.6f} ms/sample")
+    print(f"Throughput: {throughput:.2f} samples/sec")
+
+    # Class-wise Inference
+    classwise_time_df = evaluate_classwise_inference_time(model, X_test, y_test)
+
+    return metrics, report, cm, y_pred, y_prob, classwise_time_df
 
 
-def save_model(model, model_dir: Path):
-    model_dir.mkdir(parents=True, exist_ok=True)
-
-    model_path = model_dir / "lightgbm_toniot_classification.pkl"
-
-    joblib.dump(model, model_path)
-
-    # model size
-    model_size_bytes = model_path.stat().st_size
-    model_size_kb = model_size_bytes / 1024
-    model_size_mb = model_size_kb / 1024
-
-    print(f"[INFO] Model saved to: {model_path}")
-    print(f"[INFO] Model size: {model_size_kb:.2f} KB ({model_size_mb:.2f} MB)")
-
-
-def save_reports(metrics, report, cm, y_pred, y_prob, report_dir: Path):
+def save_reports(metrics, report, cm, y_test, y_pred, y_prob, report_dir: Path):
     report_dir.mkdir(parents=True, exist_ok=True)
 
     pd.DataFrame([metrics]).to_csv(report_dir / "metrics.csv", index=False)
@@ -131,19 +123,36 @@ def save_reports(metrics, report, cm, y_pred, y_prob, report_dir: Path):
 
     pd.DataFrame(cm).to_csv(report_dir / "confusion_matrix.csv", index=False)
 
-    pd.DataFrame({
-        "y_pred": y_pred,
-        "y_prob": y_prob,
-    }).to_csv(report_dir / "predictions.csv", index=False)
+    # multiclass probability 저장
+    prob_df = pd.DataFrame(
+        y_prob,
+        columns=[f"prob_class_{i}" for i in range(y_prob.shape[1])]
+    )
+
+    pred_df = pd.DataFrame({
+        "y_true": y_test.reset_index(drop=True),
+        "y_pred": y_pred
+    })
+
+    prediction_df = pd.concat([pred_df, prob_df], axis=1)
+    prediction_df.to_csv(report_dir / "predictions.csv", index=False)
 
     print(f"[INFO] Reports saved to: {report_dir}")
 
 
 def save_feature_importance(model, feature_names, report_dir: Path):
+    booster = model.booster_
+
     importance_df = pd.DataFrame({
         "feature": feature_names,
-        "importance": model.feature_importances_,
-    }).sort_values(by="importance", ascending=False)
+        "split_importance": booster.feature_importance(importance_type="split"),
+        "gain_importance": booster.feature_importance(importance_type="gain"),
+    })
+
+    importance_df = importance_df.sort_values(
+        by="gain_importance",
+        ascending=False
+    )
 
     importance_df.to_csv(report_dir / "feature_importance.csv", index=False)
 
@@ -195,13 +204,13 @@ def save_confusion_matrix_plot(cm, class_names, report_dir: Path):
 
     print(f"[INFO] Confusion matrix plot saved to: {output_path}")
 
-def run_lightgbm_pipeline():
+def run_lightgbm_pipeline(save_results=True):
     X_train, X_test, y_train, y_test = load_processed_data(PROCESSED_DIR)
 
-    model = create_lightgbm_model(10)
+    model = create_lightgbm_model(num_classes=10, random_state=RANDOM_STATE)
     model = train_model(model, X_train, y_train)
 
-    metrics, report, cm, y_pred, y_prob = evaluate_model(model, X_test, y_test)
+    metrics, report, cm, y_pred, y_prob, classwise_time_df = evaluate_model(model, X_test, y_test)
 
     class_names = [
         "backdoor",
@@ -216,8 +225,12 @@ def run_lightgbm_pipeline():
         "xss",
     ]
 
-    save_confusion_matrix_plot(cm, class_names, REPORT_DIR)
+    if (save_results):
+        save_confusion_matrix_plot(cm, class_names, REPORT_DIR)
+        classwise_time_df.to_csv(REPORT_DIR / "classwise_inference_time.csv", index=False)
+        save_reports(metrics, report, cm, y_test, y_pred, y_prob, REPORT_DIR)
+        save_feature_importance(model, X_train.columns, REPORT_DIR)
 
-    save_model(model, MODEL_DIR)
-    save_reports(metrics, report, cm, y_pred, y_prob, REPORT_DIR)
-    save_feature_importance(model, X_train.columns, REPORT_DIR)
+        save_model(model, MODEL_DIR)
+    else:
+        print("Terminate experiment without saving results")
