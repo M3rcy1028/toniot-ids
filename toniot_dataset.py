@@ -5,6 +5,10 @@ import pandas as pd
 
 import kagglehub
 
+import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+
 DATASET_HANDLE = "arnobbhowmik/ton-iot-network-dataset"
 DATA_PATH = Path("data/raw/train_test_network.csv")
 
@@ -233,14 +237,6 @@ def analyze_toniot():
     데이터셋 전처리
 '''
 
-from pathlib import Path
-
-import joblib
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-
-
 DATA_PATH = Path("data/raw/train_test_network.csv")
 OUTPUT_DIR = Path("data/processed")
 
@@ -442,11 +438,8 @@ def preprocess_dataset():
         OUTPUT_DIR,
     )
 
-
-def main():
-    preprocess_dataset()
-
-
 if __name__ == "__main__":
-    main()
+    download_toniot()
+    analyze_toniot()
+    preprocess_dataset()
 
