@@ -1,0 +1,7 @@
+,dtype,unique_count,missing_count,dash_count,missing_ratio(%),dash_ratio(%)
+date,str,7,0,0,0.0,0.0
+time,str,22152,0,0,0.0,0.0
+motion_status,int64,2,0,0,0.0,0.0
+light_status,str,2,0,0,0.0,0.0
+label,int64,2,0,0,0.0,0.0
+type,str,8,0,0,0.0,0.0

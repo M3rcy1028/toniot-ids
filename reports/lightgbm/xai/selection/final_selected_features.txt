@@ -1,0 +1,14 @@
+proto
+service
+duration
+src_bytes
+dst_bytes
+conn_state
+src_pkts
+src_ip_bytes
+dst_pkts
+dst_ip_bytes
+dns_query
+dns_rcode
+dns_AA
+dns_RD
