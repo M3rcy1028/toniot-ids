@@ -1,0 +1,7 @@
+,dtype,unique_count,missing_count,dash_count,missing_ratio(%),dash_ratio(%)
+date,str,8,0,0,0.0,0.0
+time,str,17860,0,0,0.0,0.0
+fridge_temperature,float64,151,0,0,0.0,0.0
+temp_condition,str,6,0,0,0.0,0.0
+label,int64,2,0,0,0.0,0.0
+type,str,7,0,0,0.0,0.0

@@ -1,0 +1,8 @@
+class_id,class_name
+0,backdoor
+1,ddos
+2,injection
+3,normal
+4,password
+5,ransomware
+6,xss

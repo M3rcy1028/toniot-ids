@@ -1,0 +1,8 @@
+source_file,device,rows,features,train_samples,test_samples,classes,output_dir,status,error
+Train_Test_IoT_Fridge.csv,fridge,39944,2,27960,11984,7,data/processed_iot/fridge,success,
+Train_Test_IoT_Garage_Door.csv,garage_door,39587,2,27710,11877,8,data/processed_iot/garage_door,success,
+Train_Test_IoT_GPS_Tracker.csv,gps_tracker,38960,2,27272,11688,8,data/processed_iot/gps_tracker,success,
+Train_Test_IoT_Modbus.csv,modbus,31106,4,21774,9332,6,data/processed_iot/modbus,success,
+Train_Test_IoT_Motion_Light.csv,motion_light,39488,2,27641,11847,8,data/processed_iot/motion_light,success,
+Train_Test_IoT_Thermostat.csv,thermostat,32774,2,22941,9833,7,data/processed_iot/thermostat,success,
+Train_Test_IoT_Weather.csv,weather,39260,3,27482,11778,8,data/processed_iot/weather,success,

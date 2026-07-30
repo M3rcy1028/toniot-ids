@@ -1,0 +1,635 @@
+
+[INFO] Dataset files:
+ - data/Train_Test_IoT_Fridge.csv
+ - data/Train_Test_IoT_GPS_Tracker.csv
+ - data/Train_Test_IoT_Garage_Door.csv
+ - data/Train_Test_IoT_Modbus.csv
+ - data/Train_Test_IoT_Motion_Light.csv
+ - data/Train_Test_IoT_Thermostat.csv
+ - data/Train_Test_IoT_Weather.csv
+[INFO] Found 7 IoT dataset files
+
+======================================================================
+[INFO] Analyzing device: fridge
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Fridge.csv
+[INFO] Shape: (39944, 6)
+
+========== Basic Info ==========
+Total rows: 39,944
+Total columns: 6
+
+Columns:
+ - date
+ - time
+ - fridge_temperature
+ - temp_condition
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      24944   62.4474
+0      15000   37.5526
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   37.5526
+ddos         5000   12.5175
+backdoor     5000   12.5175
+injection    5000   12.5175
+password     5000   12.5175
+ransomware   2902    7.2652
+xss          2042    5.1122
+
+Attack types:
+ - normal
+ - ddos
+ - backdoor
+ - injection
+ - password
+ - ransomware
+ - xss
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+                      count      mean       std  min  25%  50%    75%   max
+fridge_temperature  39944.0  7.142096  3.620789  1.0  4.2  6.7  10.25  14.0
+label               39944.0  0.624474  0.484264  0.0  0.0  1.0   1.00   1.0
+
+[INFO] Reports saved to: reports/ton_iot_analysis/fridge
+
+======================================================================
+[INFO] Analyzing device: garage_door
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Garage_Door.csv
+[INFO] Shape: (39587, 6)
+
+========== Basic Info ==========
+Total rows: 39,587
+Total columns: 6
+
+Columns:
+ - date
+ - time
+ - door_state
+ - sphone_signal
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      24587   62.1088
+0      15000   37.8912
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   37.8912
+ddos         5000   12.6304
+backdoor     5000   12.6304
+injection    5000   12.6304
+password     5000   12.6304
+ransomware   2902    7.3307
+xss          1156    2.9202
+scanning      529    1.3363
+
+Attack types:
+ - normal
+ - ddos
+ - backdoor
+ - injection
+ - password
+ - ransomware
+ - xss
+ - scanning
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+         count      mean       std  min  25%  50%  75%  max
+label  39587.0  0.621088  0.485122  0.0  0.0  1.0  1.0  1.0
+
+[INFO] Reports saved to: reports/ton_iot_analysis/garage_door
+
+======================================================================
+[INFO] Analyzing device: gps_tracker
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_GPS_Tracker.csv
+[INFO] Shape: (38960, 6)
+
+========== Basic Info ==========
+Total rows: 38,960
+Total columns: 6
+
+Columns:
+ - date
+ - time
+ - latitude
+ - longitude
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      23960    61.499
+0      15000    38.501
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   38.5010
+ddos         5000   12.8337
+backdoor     5000   12.8337
+injection    5000   12.8337
+password     5000   12.8337
+ransomware   2833    7.2716
+xss           577    1.4810
+scanning      550    1.4117
+
+Attack types:
+ - normal
+ - ddos
+ - backdoor
+ - injection
+ - password
+ - ransomware
+ - xss
+ - scanning
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+             count       mean        std  ...        50%        75%         max
+latitude   38960.0  55.520048  75.345705  ...  36.623451  86.592301  549.381916
+longitude  38960.0  65.849669  76.086241  ...  47.244773  96.119494  555.133643
+label      38960.0   0.614990   0.486604  ...   1.000000   1.000000    1.000000
+
+[3 rows x 8 columns]
+
+[INFO] Reports saved to: reports/ton_iot_analysis/gps_tracker
+
+======================================================================
+[INFO] Analyzing device: modbus
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Modbus.csv
+[INFO] Shape: (31106, 8)
+
+========== Basic Info ==========
+Total rows: 31,106
+Total columns: 8
+
+Columns:
+ - date
+ - time
+ - FC1_Read_Input_Register
+ - FC2_Read_Discrete_Value
+ - FC3_Read_Holding_Register
+ - FC4_Read_Coil
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      16106   51.7778
+0      15000   48.2222
+
+========== Attack Type Distribution ==========
+           count  ratio(%)
+type                      
+normal     15000   48.2222
+injection   5000   16.0741
+backdoor    5000   16.0741
+password    5000   16.0741
+xss          577    1.8549
+scanning     529    1.7006
+
+Attack types:
+ - normal
+ - injection
+ - backdoor
+ - password
+ - xss
+ - scanning
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+                             count          mean  ...      75%      max
+FC1_Read_Input_Register    31106.0  32833.925834  ...  49088.0  65510.0
+FC2_Read_Discrete_Value    31106.0  32781.719733  ...  49235.0  65535.0
+FC3_Read_Holding_Register  31106.0  32582.861859  ...  48881.0  65523.0
+FC4_Read_Coil              31106.0  32805.957468  ...  49011.0  65534.0
+label                      31106.0      0.517778  ...      1.0      1.0
+
+[5 rows x 8 columns]
+
+[INFO] Reports saved to: reports/ton_iot_analysis/modbus
+
+======================================================================
+[INFO] Analyzing device: motion_light
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Motion_Light.csv
+[INFO] Shape: (39488, 6)
+
+========== Basic Info ==========
+Total rows: 39,488
+Total columns: 6
+
+Columns:
+ - date
+ - time
+ - motion_status
+ - light_status
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      24488   62.0138
+0      15000   37.9862
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   37.9862
+ddos         5000   12.6621
+backdoor     5000   12.6621
+injection    5000   12.6621
+password     5000   12.6621
+ransomware   2264    5.7334
+scanning     1775    4.4950
+xss           449    1.1371
+
+Attack types:
+ - normal
+ - ddos
+ - backdoor
+ - injection
+ - password
+ - ransomware
+ - scanning
+ - xss
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+                 count      mean       std  min  25%  50%  75%  max
+motion_status  39488.0  0.375608  0.484286  0.0  0.0  0.0  1.0  1.0
+label          39488.0  0.620138  0.485359  0.0  0.0  1.0  1.0  1.0
+
+[INFO] Reports saved to: reports/ton_iot_analysis/motion_light
+
+======================================================================
+[INFO] Analyzing device: thermostat
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Thermostat.csv
+[INFO] Shape: (32774, 6)
+
+========== Basic Info ==========
+Total rows: 32,774
+Total columns: 6
+
+Columns:
+ - date
+ - time
+ - current_temperature
+ - thermostat_status
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      17774    54.232
+0      15000    45.768
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   45.7680
+injection    5000   15.2560
+backdoor     5000   15.2560
+password     5000   15.2560
+ransomware   2264    6.9079
+xss           449    1.3700
+scanning       61    0.1861
+
+Attack types:
+ - normal
+ - injection
+ - backdoor
+ - password
+ - ransomware
+ - xss
+ - scanning
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+                       count       mean  ...        75%        max
+current_temperature  32774.0  28.733964  ...  30.437643  34.996237
+thermostat_status    32774.0   0.890035  ...   1.000000   1.000000
+label                32774.0   0.542320  ...   1.000000   1.000000
+
+[3 rows x 8 columns]
+
+[INFO] Reports saved to: reports/ton_iot_analysis/thermostat
+
+======================================================================
+[INFO] Analyzing device: weather
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Weather.csv
+[INFO] Shape: (39260, 7)
+
+========== Basic Info ==========
+Total rows: 39,260
+Total columns: 7
+
+Columns:
+ - date
+ - time
+ - temperature
+ - pressure
+ - humidity
+ - label
+ - type
+
+========== Label Distribution ==========
+       count  ratio(%)
+label                 
+1      24260   61.7932
+0      15000   38.2068
+
+========== Attack Type Distribution ==========
+            count  ratio(%)
+type                       
+normal      15000   38.2068
+ddos         5000   12.7356
+backdoor     5000   12.7356
+injection    5000   12.7356
+password     5000   12.7356
+ransomware   2865    7.2975
+xss           866    2.2058
+scanning      529    1.3474
+
+Attack types:
+ - normal
+ - ddos
+ - backdoor
+ - injection
+ - password
+ - ransomware
+ - xss
+ - scanning
+
+========== Missing / '-' Values ==========
+[INFO] Missing values and '-' values were not found.
+
+========== Numeric Feature Summary ==========
+               count       mean        std  ...        50%        75%        max
+temperature  39260.0  35.243690   7.981171  ...  35.909279  41.396272  49.983877
+pressure     39260.0   0.834950   3.186265  ...   1.035000   1.835559  12.487613
+humidity     39260.0  47.494834  29.326872  ...  45.472256  74.171240  99.875982
+label        39260.0   0.617932   0.485899  ...   1.000000   1.000000   1.000000
+
+[4 rows x 8 columns]
+
+[INFO] Reports saved to: reports/ton_iot_analysis/weather
+[INFO] Found 7 IoT dataset files
+
+======================================================================
+[INFO] Preprocessing device: fridge
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Fridge.csv
+[INFO] Shape: (39944, 6)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (39944, 2)
+[INFO] y shape: (39944,)
+[INFO] Target classes:
+  0: backdoor
+  1: ddos
+  2: injection
+  3: normal
+  4: password
+  5: ransomware
+  6: xss
+[INFO] Categorical columns: ['temp_condition']
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/fridge
+
+[INFO] Processed data loaded
+[INFO] X_train: (27960, 2)
+[INFO] X_test : (11984, 2)
+
+======================================================================
+[INFO] Preprocessing device: garage_door
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Garage_Door.csv
+[INFO] Shape: (39587, 6)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (39587, 2)
+[INFO] y shape: (39587,)
+[INFO] Target classes:
+  0: backdoor
+  1: ddos
+  2: injection
+  3: normal
+  4: password
+  5: ransomware
+  6: scanning
+  7: xss
+[INFO] Categorical columns: ['door_state', 'sphone_signal']
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/garage_door
+
+[INFO] Processed data loaded
+[INFO] X_train: (27710, 2)
+[INFO] X_test : (11877, 2)
+
+======================================================================
+[INFO] Preprocessing device: gps_tracker
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_GPS_Tracker.csv
+[INFO] Shape: (38960, 6)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (38960, 2)
+[INFO] y shape: (38960,)
+[INFO] Target classes:
+  0: backdoor
+  1: ddos
+  2: injection
+  3: normal
+  4: password
+  5: ransomware
+  6: scanning
+  7: xss
+[INFO] Categorical columns: []
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/gps_tracker
+
+[INFO] Processed data loaded
+[INFO] X_train: (27272, 2)
+[INFO] X_test : (11688, 2)
+
+======================================================================
+[INFO] Preprocessing device: modbus
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Modbus.csv
+[INFO] Shape: (31106, 8)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (31106, 4)
+[INFO] y shape: (31106,)
+[INFO] Target classes:
+  0: backdoor
+  1: injection
+  2: normal
+  3: password
+  4: scanning
+  5: xss
+[INFO] Categorical columns: []
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/modbus
+
+[INFO] Processed data loaded
+[INFO] X_train: (21774, 4)
+[INFO] X_test : (9332, 4)
+
+======================================================================
+[INFO] Preprocessing device: motion_light
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Motion_Light.csv
+[INFO] Shape: (39488, 6)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (39488, 2)
+[INFO] y shape: (39488,)
+[INFO] Target classes:
+  0: backdoor
+  1: ddos
+  2: injection
+  3: normal
+  4: password
+  5: ransomware
+  6: scanning
+  7: xss
+[INFO] Categorical columns: ['light_status']
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/motion_light
+
+[INFO] Processed data loaded
+[INFO] X_train: (27641, 2)
+[INFO] X_test : (11847, 2)
+
+======================================================================
+[INFO] Preprocessing device: thermostat
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Thermostat.csv
+[INFO] Shape: (32774, 6)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (32774, 2)
+[INFO] y shape: (32774,)
+[INFO] Target classes:
+  0: backdoor
+  1: injection
+  2: normal
+  3: password
+  4: ransomware
+  5: scanning
+  6: xss
+[INFO] Categorical columns: []
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/thermostat
+
+[INFO] Processed data loaded
+[INFO] X_train: (22941, 2)
+[INFO] X_test : (9833, 2)
+
+======================================================================
+[INFO] Preprocessing device: weather
+======================================================================
+[INFO] Dataset loaded: data/Train_Test_IoT_Weather.csv
+[INFO] Shape: (39260, 7)
+[INFO] Dataset shuffled
+[INFO] Dropped basic columns: ['label', 'date', 'time']
+[INFO] Dropped dash-heavy columns threshold >= 0.95
+[INFO] Dropped columns: []
+[INFO] Replaced '-' with 'unknown'
+[INFO] Dropped constant columns: []
+[INFO] Missing values filled
+[INFO] X shape: (39260, 3)
+[INFO] y shape: (39260,)
+[INFO] Target classes:
+  0: backdoor
+  1: ddos
+  2: injection
+  3: normal
+  4: password
+  5: ransomware
+  6: scanning
+  7: xss
+[INFO] Categorical columns: []
+[INFO] MinMaxScaler applied
+[INFO] Saved processed datasets to: data/processed_iot/weather
+
+[INFO] Processed data loaded
+[INFO] X_train: (27482, 3)
+[INFO] X_test : (11778, 3)
+
+========== All Device Summary ==========
+                    source_file       device  rows  features  train_samples  test_samples  classes                      output_dir  status error
+      Train_Test_IoT_Fridge.csv       fridge 39944         2          27960         11984        7       data/processed_iot/fridge success      
+ Train_Test_IoT_Garage_Door.csv  garage_door 39587         2          27710         11877        8  data/processed_iot/garage_door success      
+ Train_Test_IoT_GPS_Tracker.csv  gps_tracker 38960         2          27272         11688        8  data/processed_iot/gps_tracker success      
+      Train_Test_IoT_Modbus.csv       modbus 31106         4          21774          9332        6       data/processed_iot/modbus success      
+Train_Test_IoT_Motion_Light.csv motion_light 39488         2          27641         11847        8 data/processed_iot/motion_light success      
+  Train_Test_IoT_Thermostat.csv   thermostat 32774         2          22941          9833        7   data/processed_iot/thermostat success      
+     Train_Test_IoT_Weather.csv      weather 39260         3          27482         11778        8      data/processed_iot/weather success      

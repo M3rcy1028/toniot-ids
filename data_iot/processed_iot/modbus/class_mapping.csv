@@ -1,0 +1,7 @@
+class_id,class_name
+0,backdoor
+1,injection
+2,normal
+3,password
+4,scanning
+5,xss

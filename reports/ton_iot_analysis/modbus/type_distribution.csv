@@ -1,0 +1,7 @@
+type,count,ratio(%)
+normal,15000,48.2222
+injection,5000,16.0741
+backdoor,5000,16.0741
+password,5000,16.0741
+xss,577,1.8549
+scanning,529,1.7006

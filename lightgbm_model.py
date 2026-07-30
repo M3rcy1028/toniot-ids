@@ -27,7 +27,8 @@ def train_model(model, X_train, y_train):
         X_train,
         y_train,
         eval_set=[(X_train, y_train)],
-        eval_metric="binary_logloss",
+        eval_metric="multi_logloss",
+        callbacks=[lgb.log_evaluation(period=20)],
     )
 
     print("[INFO] Training complete")

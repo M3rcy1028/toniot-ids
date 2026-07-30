@@ -32,6 +32,12 @@ def download_dataset(dataset_handle: str = DATASET_HANDLE) -> Path:
 def copy_dataset(src_path: Path, dst_dir: str | Path) -> Path:
     dst_dir = make_dir(dst_dir)
 
+    if src_path.is_file():
+        target = dst_dir / src_path.name
+        shutil.copy2(src_path, target)
+        print(f"[INFO] Dataset copied to: {dst_dir}")
+        return dst_dir
+
     for item in src_path.iterdir():
         target = dst_dir / item.name
 
@@ -56,11 +62,27 @@ def list_files(dataset_dir: str | Path) -> None:
 
 
 def download_toniot():
-    save_dir = Path("data/raw/ton_iot")
+    save_dir = Path("data/raw")
 
     downloaded_path = download_dataset(DATASET_HANDLE)
     final_path = copy_dataset(downloaded_path, save_dir)
     list_files(final_path)
+
+
+def ensure_raw_dataset():
+    if DATA_PATH.exists():
+        print(f"[INFO] Raw dataset already exists: {DATA_PATH}")
+        return DATA_PATH
+
+    print("[INFO] Raw dataset not found. Downloading raw dataset...")
+    download_toniot()
+
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(
+            f"Raw dataset download finished but expected file still missing: {DATA_PATH}"
+        )
+
+    return DATA_PATH
 
 '''
     데이터셋 분석하는 코드
@@ -238,7 +260,7 @@ def analyze_toniot():
 '''
 
 DATA_PATH = Path("data/raw/train_test_network.csv")
-OUTPUT_DIR = Path("data/processed")
+OUTPUT_DIR = Path("data/processed_type")
 
 TARGET_COLUMN = "type"
 
@@ -404,7 +426,7 @@ def save_outputs(
     print(f"[INFO] Saved processed datasets to: {output_dir}")
 
 
-def preprocess_dataset():
+def preprocess_dataset(output_dir: Path = OUTPUT_DIR):
     df = load_dataset(DATA_PATH)
 
     df = shuffle_dataset(df)
@@ -435,11 +457,30 @@ def preprocess_dataset():
         encoders,
         target_encoder,
         scaler,
-        OUTPUT_DIR,
+        output_dir,
     )
 
-if __name__ == "__main__":
-    download_toniot()
-    analyze_toniot()
+
+def ensure_processed_dataset(processed_dir: Path = OUTPUT_DIR):
+    expected_files = [
+        processed_dir / "X_train.csv",
+        processed_dir / "X_test.csv",
+        processed_dir / "y_train.csv",
+        processed_dir / "y_test.csv",
+    ]
+
+    if all(path.exists() for path in expected_files):
+        print(f"[INFO] Processed dataset already exists: {processed_dir}")
+        return processed_dir
+
+    print(f"[INFO] Processed dataset missing at {processed_dir}. Rebuilding from raw data...")
+    ensure_raw_dataset()
     preprocess_dataset()
+
+    if not all(path.exists() for path in expected_files):
+        raise FileNotFoundError(
+            f"Processed dataset was not created properly in: {processed_dir}"
+        )
+
+    return processed_dir
 

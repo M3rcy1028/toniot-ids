@@ -1,0 +1,9 @@
+type,count,ratio(%)
+normal,15000,37.8912
+ddos,5000,12.6304
+backdoor,5000,12.6304
+injection,5000,12.6304
+password,5000,12.6304
+ransomware,2902,7.3307
+xss,1156,2.9202
+scanning,529,1.3363

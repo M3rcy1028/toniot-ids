@@ -1,0 +1,152 @@
+[INFO] Processed dataset already exists: data_network/processed_type
+[INFO] Processed data loaded
+[INFO] X_train: (147730, 22)
+[INFO] X_test : (63313, 22)
+[INFO] Training LightGBM model...
+[20]	training's multi_logloss: 0.35418
+[40]	training's multi_logloss: 0.130625
+[60]	training's multi_logloss: 0.0827521
+[80]	training's multi_logloss: 0.0682499
+[100]	training's multi_logloss: 0.0620341
+[120]	training's multi_logloss: 0.0585573
+[140]	training's multi_logloss: 0.0562354
+[160]	training's multi_logloss: 0.0544043
+[180]	training's multi_logloss: 0.0530017
+[200]	training's multi_logloss: 0.0518694
+[220]	training's multi_logloss: 0.0508965
+[240]	training's multi_logloss: 0.0500823
+[260]	training's multi_logloss: 0.0494689
+[280]	training's multi_logloss: 0.0489498
+[300]	training's multi_logloss: 0.0485007
+[320]	training's multi_logloss: 0.0480727
+[340]	training's multi_logloss: 0.0476957
+[360]	training's multi_logloss: 0.0473721
+[380]	training's multi_logloss: 0.0470915
+[400]	training's multi_logloss: 0.0468572
+[420]	training's multi_logloss: 0.0466497
+[440]	training's multi_logloss: 0.0464468
+[460]	training's multi_logloss: 0.0462856
+[480]	training's multi_logloss: 0.0461353
+[500]	training's multi_logloss: 0.0459837
+[INFO] Training complete
+
+========== Evaluation Results ==========
+accuracy: 0.977903
+precision_macro: 0.942487
+recall_macro: 0.967886
+f1_macro: 0.952460
+total_inference_time_sec: 1.656275
+avg_inference_time_ms: 0.026160
+throughput_samples_per_sec: 38226.137136
+
+========== Classification Report ==========
+              precision    recall  f1-score   support
+
+           0     0.9998    0.9997    0.9997      6000
+           1     0.9875    0.9760    0.9817      6000
+           2     0.9904    0.9825    0.9864      6000
+           3     0.9825    0.9625    0.9724      6000
+           4     0.6225    0.9010    0.7363       313
+           5     0.9981    0.9961    0.9971     15000
+           6     0.9973    0.9765    0.9868      6000
+           7     0.9116    0.9808    0.9449      6000
+           8     0.9890    0.9907    0.9898      6000
+           9     0.9461    0.9132    0.9294      6000
+
+    accuracy                         0.9779     63313
+   macro avg     0.9425    0.9679    0.9525     63313
+weighted avg     0.9791    0.9779    0.9782     63313
+
+
+========== Confusion Matrix ==========
+[[ 5998     0     0     0     2     0     0     0     0     0]
+ [    0  5856     2    22     4     5     0    68     0    43]
+ [    0     1  5895     0    48     9     5     2    40     0]
+ [    0    42     6  5775    20     4     0     5    18   130]
+ [    0     2    13     2   282     8     2     1     2     1]
+ [    1     2     6     1    23 14941     6    16     0     4]
+ [    0     1     1     2    50     2  5859    60     6    19]
+ [    0     0     0     0     0     0     0  5885     0   115]
+ [    0     0    26     3    22     0     3     2  5944     0]
+ [    0    26     3    73     2     0     0   417     0  5479]]
+
+========== Batch Inference Time ==========
+Total inference time: 1.656275 sec
+Average inference time: 0.026160 ms/sample
+Throughput: 38226.14 samples/sec
+
+========== Class-wise Inference Time ==========
+   class_id  samples  total_inference_time_sec  avg_inference_time_ms
+0         0     6000                  0.083161               0.013860
+1         1     6000                  0.093106               0.015518
+2         2     6000                  0.090488               0.015081
+3         3     6000                  0.094035               0.015673
+4         4      313                  0.010351               0.033070
+5         5    15000                  0.205909               0.013727
+6         6     6000                  0.097757               0.016293
+7         7     6000                  0.081539               0.013590
+8         8     6000                  0.085179               0.014197
+9         9     6000                  0.086334               0.014389
+[INFO] Confusion matrix plot saved to: reports/lightgbm/confusion_matrix.png
+[INFO] Reports saved to: reports/lightgbm
+
+========== Top 20 Feature Importance ==========
+             feature  split_importance  gain_importance
+8       src_ip_bytes             22383     1.952213e+06
+5         conn_state              9566     1.015356e+06
+3          src_bytes             11292     8.406528e+05
+7           src_pkts              8493     6.694232e+05
+2           duration             38502     5.626761e+05
+10      dst_ip_bytes             14066     4.624099e+05
+4          dst_bytes             11529     3.969684e+05
+9           dst_pkts              6479     2.758996e+05
+17            dns_RA               668     1.381534e+05
+11         dns_query             10129     1.280988e+05
+1            service              2391     1.186934e+05
+18      dns_rejected               541     1.064455e+05
+0              proto              2199     1.040513e+05
+15            dns_AA               470     4.882193e+04
+14         dns_rcode               952     3.536778e+04
+16            dns_RD               499     9.279669e+03
+6       missed_bytes               933     6.629671e+03
+13         dns_qtype              1413     5.656248e+03
+21  http_status_code               250     2.719438e+03
+12        dns_qclass               135     1.300256e+03
+[INFO] Feature importance saved to: reports/lightgbm/feature_importance.csv
+[INFO] Model saved to: models/lightgbm_toniot_classification.pkl
+[INFO] Model size: 16955.68 KB (16.56 MB)
+[INFO] Training LightGBM model...
+[20]	training's multi_logloss: 0.353515
+[40]	training's multi_logloss: 0.1297
+[60]	training's multi_logloss: 0.0815699
+[80]	training's multi_logloss: 0.0667941
+[100]	training's multi_logloss: 0.0604706
+[120]	training's multi_logloss: 0.0569765
+[140]	training's multi_logloss: 0.0545657
+[160]	training's multi_logloss: 0.052751
+[180]	training's multi_logloss: 0.0512738
+[200]	training's multi_logloss: 0.0501559
+[220]	training's multi_logloss: 0.0492491
+[240]	training's multi_logloss: 0.0484737
+[260]	training's multi_logloss: 0.0479295
+[280]	training's multi_logloss: 0.0474024
+[300]	training's multi_logloss: 0.0469721
+[320]	training's multi_logloss: 0.0465861
+[340]	training's multi_logloss: 0.0462796
+[360]	training's multi_logloss: 0.0459995
+[380]	training's multi_logloss: 0.0457759
+[400]	training's multi_logloss: 0.045553
+[420]	training's multi_logloss: 0.0453729
+[440]	training's multi_logloss: 0.0451948
+[460]	training's multi_logloss: 0.0450496
+[480]	training's multi_logloss: 0.0449244
+[500]	training's multi_logloss: 0.0448052
+[INFO] Training complete
+
+========== XAI Feature Selection ==========
+Selected 14 / 22 features
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_rcode', 'dns_AA', 'dns_RD']
+[INFO] XAI reports saved to: reports/lightgbm/xai
+
+[INFO] Features for the next reduction phase:
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_rcode', 'dns_AA', 'dns_RD']
