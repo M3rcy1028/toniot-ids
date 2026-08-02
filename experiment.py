@@ -27,20 +27,20 @@ XAI_DIR = REPORT_DIR / "xai"
 RANDOM_STATE = 42
 
 CLASS_NAMES = [
-    "backdoor",
-    "ddos",
-    "dos",
-    "injection",
-    "mitm",
-    "normal",
-    "password",
-    "ransomware",
-    "scanning",
-    "xss",
+    "backdoor",     # 0
+    "ddos",         # 1
+    "dos",          # 2
+    "injection",    # 3
+    "mitm",         # 4
+    "normal",       # 5
+    "password",     # 6
+    "ransomware",   # 7
+    "scanning",     # 8
+    "xss",          # 9
 ]
 
 
-def load_processed_data(processed_dir: Path):
+def load_processed_data(processed_dir: Path, feature_selection=False, fs_config=None):
     ensure_processed_dataset(processed_dir)
 
     X_train = pd.read_csv(processed_dir / "X_train.csv")
@@ -48,10 +48,17 @@ def load_processed_data(processed_dir: Path):
     y_train = pd.read_csv(processed_dir / "y_train.csv").squeeze("columns")
     y_test = pd.read_csv(processed_dir / "y_test.csv").squeeze("columns")
 
+    if feature_selection:
+        print("[INFO] Feature selection enabled")
+        selected_features = pd.read_csv(fs_config)["feature"].tolist()
+
+        X_train = X_train[selected_features]
+        X_test = X_test[selected_features]
+
     print("[INFO] Processed data loaded")
     print(f"[INFO] X_train: {X_train.shape}")
     print(f"[INFO] X_test : {X_test.shape}")
-
+    
     return X_train, X_test, y_train, y_test
 
 
@@ -275,8 +282,8 @@ def run_xai_feature_selection(X_train, y_train):
     )
 
 
-def run_lightgbm_pipeline(save_results=True, run_xai=True):
-    X_train, X_test, y_train, y_test = load_processed_data(PROCESSED_DIR)
+def run_lightgbm_pipeline(save_results=True, feature_selection=False, fs_config=None, run_xai=True):
+    X_train, X_test, y_train, y_test = load_processed_data(PROCESSED_DIR, feature_selection=feature_selection, fs_config=fs_config)
 
     # Final baseline model: train on all training rows and evaluate once on test.
     model = create_lightgbm_model(
