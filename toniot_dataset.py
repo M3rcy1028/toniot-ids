@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 DATASET_HANDLE = "arnobbhowmik/ton-iot-network-dataset"
-DATA_PATH = Path("data/raw/train_test_network.csv")
+DATA_PATH = Path("data_network/raw/train_test_network.csv")
 
 '''
     데이터셋 다운로드하는 코드
@@ -62,7 +62,7 @@ def list_files(dataset_dir: str | Path) -> None:
 
 
 def download_toniot():
-    save_dir = Path("data/raw")
+    save_dir = Path("data_network/raw")
 
     downloaded_path = download_dataset(DATASET_HANDLE)
     final_path = copy_dataset(downloaded_path, save_dir)
@@ -259,8 +259,8 @@ def analyze_toniot():
     데이터셋 전처리
 '''
 
-DATA_PATH = Path("data/raw/train_test_network.csv")
-OUTPUT_DIR = Path("data/processed_type")
+DATA_PATH = Path("data_network/raw/train_test_network.csv")
+OUTPUT_DIR = Path("data_network/processed_type")
 
 TARGET_COLUMN = "type"
 
@@ -274,7 +274,8 @@ DROP_COLUMNS = [
 
 DASH_DROP_THRESHOLD = 0.95
 RANDOM_STATE = 42
-TEST_SIZE = 0.3
+VALID_SIZE = 0.15
+TEST_SIZE = 0.15
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
@@ -333,10 +334,15 @@ def split_features_target(df: pd.DataFrame):
     print(f"[INFO] y shape: {y.shape}")
     return X, y
 
-def encode_target(y_train: pd.Series, y_test: pd.Series):
+def encode_target(
+    y_train: pd.Series,
+    y_valid: pd.Series,
+    y_test: pd.Series,
+):
     target_encoder = LabelEncoder()
 
     y_train_encoded = target_encoder.fit_transform(y_train)
+    y_valid_encoded = target_encoder.transform(y_valid)
     y_test_encoded = target_encoder.transform(y_test)
 
     print("[INFO] Target classes:")
@@ -345,11 +351,16 @@ def encode_target(y_train: pd.Series, y_test: pd.Series):
 
     return (
         pd.Series(y_train_encoded, name=TARGET_COLUMN),
+        pd.Series(y_valid_encoded, name=TARGET_COLUMN),
         pd.Series(y_test_encoded, name=TARGET_COLUMN),
         target_encoder,
     )
 
-def encode_categorical_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
+def encode_categorical_features(
+    X_train: pd.DataFrame,
+    X_valid: pd.DataFrame,
+    X_test: pd.DataFrame,
+):
     encoders = {}
 
     categorical_cols = X_train.select_dtypes(include=["object"]).columns.tolist()
@@ -360,6 +371,7 @@ def encode_categorical_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
         encoder = LabelEncoder()
 
         X_train[col] = X_train[col].astype(str)
+        X_valid[col] = X_valid[col].astype(str)
         X_test[col] = X_test[col].astype(str)
 
         encoder.fit(X_train[col])
@@ -368,6 +380,9 @@ def encode_categorical_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
 
         # test에 train에 없던 값이 나오면 unknown 처리
         known_classes = set(encoder.classes_)
+        X_valid[col] = X_valid[col].apply(
+            lambda x: x if x in known_classes else "unknown"
+        )
         X_test[col] = X_test[col].apply(
             lambda x: x if x in known_classes else "unknown"
         )
@@ -375,22 +390,33 @@ def encode_categorical_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
         if "unknown" not in encoder.classes_:
             encoder.classes_ = pd.Index(list(encoder.classes_) + ["unknown"]).to_numpy()
 
+        X_valid[col] = encoder.transform(X_valid[col])
         X_test[col] = encoder.transform(X_test[col])
 
         encoders[col] = encoder
 
-    return X_train, X_test, encoders
+    return X_train, X_valid, X_test, encoders
 
 
-def scale_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
+def scale_features(
+    X_train: pd.DataFrame,
+    X_valid: pd.DataFrame,
+    X_test: pd.DataFrame,
+):
     scaler = MinMaxScaler()
 
     X_train_scaled = scaler.fit_transform(X_train)
+    X_valid_scaled = scaler.transform(X_valid)
     X_test_scaled = scaler.transform(X_test)
 
     X_train_scaled = pd.DataFrame(
         X_train_scaled,
         columns=X_train.columns
+    )
+
+    X_valid_scaled = pd.DataFrame(
+        X_valid_scaled,
+        columns=X_valid.columns
     )
 
     X_test_scaled = pd.DataFrame(
@@ -399,13 +425,15 @@ def scale_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
     )
 
     print("[INFO] MinMaxScaler applied")
-    return X_train_scaled, X_test_scaled, scaler
+    return X_train_scaled, X_valid_scaled, X_test_scaled, scaler
 
 
 def save_outputs(
     X_train,
+    X_valid,
     X_test,
     y_train,
+    y_valid,
     y_test,
     encoders,
     target_encoder,
@@ -415,8 +443,10 @@ def save_outputs(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     X_train.to_csv(output_dir / "X_train.csv", index=False)
+    X_valid.to_csv(output_dir / "X_valid.csv", index=False)
     X_test.to_csv(output_dir / "X_test.csv", index=False)
     y_train.to_csv(output_dir / "y_train.csv", index=False)
+    y_valid.to_csv(output_dir / "y_valid.csv", index=False)
     y_test.to_csv(output_dir / "y_test.csv", index=False)
 
     joblib.dump(encoders, output_dir / "label_encoders.pkl")
@@ -436,7 +466,7 @@ def preprocess_dataset(output_dir: Path = OUTPUT_DIR):
 
     X, y = split_features_target(df)
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_train_valid, X_test, y_train_valid, y_test = train_test_split(
         X,
         y,
         test_size=TEST_SIZE,
@@ -444,15 +474,43 @@ def preprocess_dataset(output_dir: Path = OUTPUT_DIR):
         stratify=y,
     )
 
-    y_train, y_test, target_encoder = encode_target(y_train, y_test)
+    valid_fraction_of_remainder = VALID_SIZE / (1 - TEST_SIZE)
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X_train_valid,
+        y_train_valid,
+        test_size=valid_fraction_of_remainder,
+        random_state=RANDOM_STATE,
+        stratify=y_train_valid,
+    )
 
-    X_train, X_test, encoders = encode_categorical_features(X_train, X_test)
-    X_train, X_test, scaler = scale_features(X_train, X_test)
+    print(
+        "[INFO] Dataset split: "
+        f"train={len(X_train)}, valid={len(X_valid)}, test={len(X_test)}"
+    )
+
+    y_train, y_valid, y_test, target_encoder = encode_target(
+        y_train,
+        y_valid,
+        y_test,
+    )
+
+    X_train, X_valid, X_test, encoders = encode_categorical_features(
+        X_train,
+        X_valid,
+        X_test,
+    )
+    X_train, X_valid, X_test, scaler = scale_features(
+        X_train,
+        X_valid,
+        X_test,
+    )
 
     save_outputs(
         X_train,
+        X_valid,
         X_test,
         y_train.reset_index(drop=True),
+        y_valid.reset_index(drop=True),
         y_test.reset_index(drop=True),
         encoders,
         target_encoder,
@@ -464,8 +522,10 @@ def preprocess_dataset(output_dir: Path = OUTPUT_DIR):
 def ensure_processed_dataset(processed_dir: Path = OUTPUT_DIR):
     expected_files = [
         processed_dir / "X_train.csv",
+        processed_dir / "X_valid.csv",
         processed_dir / "X_test.csv",
         processed_dir / "y_train.csv",
+        processed_dir / "y_valid.csv",
         processed_dir / "y_test.csv",
     ]
 
@@ -475,7 +535,7 @@ def ensure_processed_dataset(processed_dir: Path = OUTPUT_DIR):
 
     print(f"[INFO] Processed dataset missing at {processed_dir}. Rebuilding from raw data...")
     ensure_raw_dataset()
-    preprocess_dataset()
+    preprocess_dataset(output_dir=processed_dir)
 
     if not all(path.exists() for path in expected_files):
         raise FileNotFoundError(
@@ -483,4 +543,3 @@ def ensure_processed_dataset(processed_dir: Path = OUTPUT_DIR):
         )
 
     return processed_dir
-

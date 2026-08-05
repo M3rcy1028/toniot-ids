@@ -1,0 +1,106 @@
+[INFO] Processed dataset already exists: data_network/processed_type
+[INFO] Processed data loaded
+[INFO] X_train: (147729, 22)
+[INFO] X_valid: (31657, 22)
+[INFO] X_test : (31657, 22)
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.321382
+[40]	valid_0's multi_logloss: 0.116893
+[60]	valid_0's multi_logloss: 0.0759308
+[80]	valid_0's multi_logloss: 0.0654986
+[100]	valid_0's multi_logloss: 0.0618282
+[120]	valid_0's multi_logloss: 0.0602275
+[140]	valid_0's multi_logloss: 0.0594139
+[160]	valid_0's multi_logloss: 0.0588716
+[180]	valid_0's multi_logloss: 0.0585782
+[200]	valid_0's multi_logloss: 0.058438
+[220]	valid_0's multi_logloss: 0.0583846
+[240]	valid_0's multi_logloss: 0.0585065
+[260]	valid_0's multi_logloss: 0.0587175
+Early stopping, best iteration is:
+[219]	valid_0's multi_logloss: 0.0583785
+[INFO] Best iteration: 219
+[INFO] Training complete
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.321382
+[40]	valid_0's multi_logloss: 0.116893
+[60]	valid_0's multi_logloss: 0.0759308
+[80]	valid_0's multi_logloss: 0.0654986
+[100]	valid_0's multi_logloss: 0.0618282
+[120]	valid_0's multi_logloss: 0.0602275
+[140]	valid_0's multi_logloss: 0.0594139
+[160]	valid_0's multi_logloss: 0.0588716
+[180]	valid_0's multi_logloss: 0.0585782
+[200]	valid_0's multi_logloss: 0.058438
+[220]	valid_0's multi_logloss: 0.0583846
+[240]	valid_0's multi_logloss: 0.0585065
+[260]	valid_0's multi_logloss: 0.0587175
+Early stopping, best iteration is:
+[219]	valid_0's multi_logloss: 0.0583785
+[INFO] Best iteration: 219
+[INFO] Training complete
+[INFO] Computing full-train class-balanced SAGE for 147,729 rows and 16 features...
+[INFO] SAGE repeat 1/1: 5/16 features revealed
+[INFO] SAGE repeat 1/1: 10/16 features revealed
+[INFO] SAGE repeat 1/1: 15/16 features revealed
+[INFO] SAGE repeat 1/1: 16/16 features revealed
+[INFO] Computing full-train SHAP for 147,729 rows...
+[INFO] SHAP progress: 40,960/147,729
+[INFO] SHAP progress: 81,920/147,729
+[INFO] SHAP progress: 122,880/147,729
+[INFO] SHAP progress: 147,729/147,729
+[INFO] CPF progress: 1/16 (proto)
+[INFO] CPF progress: 2/16 (service)
+[INFO] CPF progress: 3/16 (duration)
+[INFO] CPF progress: 4/16 (src_bytes)
+[INFO] CPF progress: 5/16 (dst_bytes)
+[INFO] CPF progress: 6/16 (conn_state)
+[INFO] CPF progress: 7/16 (src_pkts)
+[INFO] CPF progress: 8/16 (src_ip_bytes)
+[INFO] CPF progress: 9/16 (dst_pkts)
+[INFO] CPF progress: 10/16 (dst_ip_bytes)
+[INFO] CPF progress: 11/16 (dns_query)
+[INFO] CPF progress: 12/16 (dns_rcode)
+[INFO] CPF progress: 13/16 (dns_AA)
+[INFO] CPF progress: 14/16 (dns_RD)
+[INFO] CPF progress: 15/16 (dns_RA)
+[INFO] CPF progress: 16/16 (dns_rejected)
+[INFO] Computing full-train SHAP interactions for 147,729 rows...
+[INFO] SHAP interaction analysis skipped: the explainer returned 1 interaction output(s) for a 10-class model. The tensor will not be repeated because doing so would produce invalid class-wise interactions.
+
+========== XAI Feature Selection ==========
+Selected 14 / 16 features
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_AA', 'dns_RA', 'dns_rejected']
+[INFO] XAI reports saved to: reports/lightgbm_260805/xai/reduction_3
+[INFO] Reduction-3 selected features (14):
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_AA', 'dns_RA', 'dns_rejected']
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.330169
+[40]	valid_0's multi_logloss: 0.118901
+[60]	valid_0's multi_logloss: 0.0765212
+[80]	valid_0's multi_logloss: 0.0656266
+[100]	valid_0's multi_logloss: 0.0619575
+[120]	valid_0's multi_logloss: 0.0604091
+[140]	valid_0's multi_logloss: 0.0595373
+[160]	valid_0's multi_logloss: 0.058998
+[180]	valid_0's multi_logloss: 0.0587258
+[200]	valid_0's multi_logloss: 0.0586448
+[220]	valid_0's multi_logloss: 0.0587317
+[240]	valid_0's multi_logloss: 0.0588224
+Early stopping, best iteration is:
+[203]	valid_0's multi_logloss: 0.0586343
+[INFO] Best iteration: 203
+[INFO] Training complete
+
+========== Validation Comparison ==========
+         model  accuracy  precision_macro  recall_macro  f1_macro  mitm_recall
+reduction_2_16  0.980320         0.957966      0.960358  0.958986     0.796178
+reduction_3_14  0.979941         0.956039      0.958771  0.957218     0.783439
+
+========== Reduction-3 Acceptance ==========
+ accepted  selected_feature_count  accuracy_drop  macro_f1_drop  mitm_recall_drop
+    False                      14       0.000379       0.001767          0.012739
+[WARN] Reduction-3 rejected; test data was not evaluated.

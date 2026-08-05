@@ -1,0 +1,15 @@
+feature,selection_sources,protected_classes,macro_sage_importance,rank_sage
+src_ip_bytes,macro_sage_core;shap_intersection_cpf,backdoor;ddos;dos;injection;mitm;normal;password;ransomware;scanning;xss,1.812806548608051,1
+conn_state,macro_sage_core;shap_intersection_cpf,backdoor;ddos;dos;injection;normal;password;ransomware;scanning;xss,1.0900311730303538,2
+duration,macro_sage_core;shap_intersection_cpf,backdoor;ddos;dos;injection;mitm;normal;password;ransomware;scanning;xss,0.7092974365200779,3
+src_bytes,macro_sage_core;shap_intersection_cpf,backdoor;dos;injection;mitm;password;xss,0.4663687244498583,4
+dst_ip_bytes,macro_sage_core;shap_intersection_cpf,ddos;dos;injection;mitm;password;ransomware;scanning,0.4552784102295947,5
+src_pkts,macro_sage_core;shap_intersection_cpf,backdoor;ddos;dos;injection;mitm;normal;password;ransomware;xss,0.3886835723653342,6
+proto,macro_sage_core;shap_intersection_cpf,normal;ransomware;scanning,0.2718347934777879,7
+dns_query,macro_sage_core;shap_intersection_cpf,ddos;dos;mitm;scanning;xss,0.26016532392230507,8
+dst_pkts,macro_sage_core;shap_intersection_cpf,backdoor;normal;ransomware,0.2577907885820921,9
+dst_bytes,macro_sage_core;shap_intersection_cpf,ddos;injection;mitm;xss,0.244881689590231,10
+service,macro_sage_floor,,0.12204444784556175,11
+dns_RA,macro_sage_floor,,0.0609398614004971,12
+dns_rejected,macro_sage_floor,,0.02822758309364843,13
+dns_AA,macro_sage_floor,,0.023705779943006763,14

@@ -1,0 +1,158 @@
+TON_IoT LightGBM 원본 모델과 Feature Reduction-1 비교
+작성 시각: 2026-08-05 18:17 KST
+
+1. 비교 대상
+===============================================================================
+
+[원본 모델]
+- 입력 feature 수: 22개
+- 모델 파일: models/lightgbm_toniot_classification.pkl
+- 학습 조건: LightGBM multiclass, 동일 train/validation/test split
+- Early stopping best iteration: 227
+
+[Reduction-1 모델]
+- 입력 feature 수: 18개
+- 모델 파일: models/lightgbm_toniot_classification_reduction_1.pkl
+- 선택 방법: 전체 train 기반 Macro-SAGE core + class-wise SHAP/CPF 보호
+- Early stopping best iteration: 203
+
+두 모델은 동일한 train 147,729개, validation 31,657개, test 31,657개를
+사용했으며 feature 구성 이외의 LightGBM 설정은 동일하다.
+
+
+2. Feature 구성 비교
+===============================================================================
+
+원본 22개 feature:
+proto, service, duration, src_bytes, dst_bytes, conn_state, missed_bytes,
+src_pkts, src_ip_bytes, dst_pkts, dst_ip_bytes, dns_query, dns_qclass,
+dns_qtype, dns_rcode, dns_AA, dns_RD, dns_RA, dns_rejected,
+http_request_body_len, http_response_body_len, http_status_code
+
+Reduction-1에 선택된 18개 feature:
+proto, service, duration, src_bytes, dst_bytes, conn_state, src_pkts,
+src_ip_bytes, dst_pkts, dst_ip_bytes, dns_query, dns_qclass, dns_qtype,
+dns_rcode, dns_AA, dns_RD, dns_RA, dns_rejected
+
+제거된 4개 feature:
+- missed_bytes
+- http_request_body_len
+- http_response_body_len
+- http_status_code
+
+Feature 감소율: 4/22 = 18.18%
+
+
+3. Validation 성능 비교
+===============================================================================
+
+지표                 원본 22개       Reduction-1 18개    R1 변화
+-------------------------------------------------------------------------------
+Accuracy             98.0257%        98.0131%            -0.0126%p
+Macro precision      95.6866%        95.6184%            -0.0682%p
+Macro recall         95.9628%        95.8931%            -0.0697%p
+Macro F1             95.8059%        95.7370%            -0.0689%p
+MITM recall          78.9809%        78.3439%            -0.6369%p
+
+해석:
+- Reduction-1은 validation에서 원본보다 소폭 낮았다.
+- 그러나 사전에 정한 허용 기준인 Accuracy 0.1%p, Macro F1 0.2%p,
+  MITM recall 1.0%p 이내의 하락을 모두 만족해 채택됐다.
+
+
+4. Test 전체 성능 비교
+===============================================================================
+
+지표                 원본 22개       Reduction-1 18개    R1 변화
+-------------------------------------------------------------------------------
+Accuracy             97.7920%        97.8172%            +0.0253%p
+Macro precision      95.3154%        95.5566%            +0.2413%p
+Macro recall         95.2816%        95.6200%            +0.3385%p
+Macro F1             95.2795%        95.5692%            +0.2897%p
+Weighted F1          97.80%           97.82%              +0.02%p
+
+해석:
+- 4개 feature를 제거했음에도 test Accuracy가 소폭 상승했다.
+- Macro precision, recall, F1이 모두 상승해 클래스 균형 성능이 개선됐다.
+- Accuracy 차이는 작지만 Macro F1의 +0.2897%p 개선은 소수 클래스 성능까지
+  함께 좋아졌다는 점에서 의미가 있다.
+
+
+5. MITM 및 Normal 클래스 비교
+===============================================================================
+
+[MITM: class 4, test support 157]
+지표                 원본 22개       Reduction-1 18개    R1 변화
+-------------------------------------------------------------------------------
+Precision            74.05%          76.25%              +2.20%p
+Recall               74.52%          77.71%              +3.19%p
+F1                   74.29%          76.97%              +2.68%p
+정분류 수            117/157         122/157             +5건
+False positive 수    41건            38건                -3건
+
+MITM 해석:
+- Reduction-1은 MITM을 5건 더 탐지했다.
+- 동시에 다른 클래스를 MITM으로 잘못 예측한 건수도 3건 감소했다.
+- 따라서 MITM precision과 recall이 함께 개선됐고 F1이 2.68%p 상승했다.
+
+[Normal: class 5, test support 7,500]
+지표                 원본 22개       Reduction-1 18개    R1 변화
+-------------------------------------------------------------------------------
+Precision            99.63%          99.60%              -0.03%p
+Recall               99.83%          99.76%              -0.07%p
+F1                   99.73%          99.68%              -0.05%p
+
+Normal 해석:
+- Normal 지표는 아주 소폭 하락했다.
+- F1 하락은 0.05%p로 작으며 여전히 99.68%를 유지한다.
+- 이 작은 손실과 비교해 MITM 및 전체 Macro 지표의 개선 폭이 더 크다.
+
+
+6. 모델 크기 및 추론 효율
+===============================================================================
+
+항목                 원본 22개       Reduction-1 18개    R1 변화
+-------------------------------------------------------------------------------
+모델 크기            8,152,020 B     7,273,284 B         -878,736 B (-10.78%)
+모델 크기(MiB)       약 7.77 MiB     약 6.94 MiB         약 -0.84 MiB
+Best iteration       227             203                 -24 rounds
+평균 추론 시간       0.074248 ms     0.064510 ms         -13.12%
+전체 test 추론 시간  2.350475 sec    2.042198 sec        -13.11%
+처리량               13,468/s        15,501/s            +15.10%
+
+해석:
+- Reduction-1은 feature뿐 아니라 필요한 boosting iteration도 감소했다.
+- 모델 파일이 약 10.8% 작아지고 실측 평균 추론 시간이 약 13.1% 감소했다.
+- 추론 시간은 시스템 부하의 영향을 받을 수 있으므로 반복 측정 시 수치가
+  달라질 수 있지만, 이번 동일 환경 측정에서는 Reduction-1이 더 효율적이었다.
+
+
+7. 최종 판단
+===============================================================================
+
+Reduction-1은 원본 대비 feature를 18.18% 줄이면서 다음 결과를 보였다.
+
+- Test Accuracy: +0.0253%p
+- Test Macro F1: +0.2897%p
+- MITM F1: +2.68%p
+- 모델 크기: -10.78%
+- 평균 추론 시간: -13.12%
+- Normal F1: -0.05%p
+
+따라서 현재 결과에서는 Reduction-1이 원본 22-feature 모델보다 성능 균형과
+효율이 모두 좋은 모델로 판단된다. 특히 기존 문제였던 MITM 탐지 성능이
+개선된 점이 가장 큰 장점이다.
+
+다만 이 결론은 현재 test split 한 개의 결과다. 최종 배포 모델을 확정하기
+전에는 반복 seed 평가 또는 별도의 untouched/group-aware holdout에서 개선이
+재현되는지 확인하는 것이 필요하다.
+
+
+8. 결과 출처
+===============================================================================
+
+- 원본 결과: reports/lightgbm_260805/
+- Reduction-1 결과: reports/lightgbm_260805/reduction_1/
+- Reduction-1 XAI: reports/lightgbm_260805/xai/reduction_1/
+- 원본 모델: models/lightgbm_toniot_classification.pkl
+- Reduction-1 모델: models/lightgbm_toniot_classification_reduction_1.pkl
