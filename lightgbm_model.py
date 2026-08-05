@@ -7,37 +7,50 @@ def create_lightgbm_model(num_classes: int, random_state: int = 42) -> lgb.LGBMC
         objective="multiclass",
         num_class=num_classes,
         boosting_type="gbdt",
-        n_estimators=500,
+        n_estimators=3000,
         learning_rate=0.05,
         num_leaves=31,
         max_depth=15,
         subsample=0.8,
         colsample_bytree=0.8,
         random_state=random_state,
-        n_jobs=-1,
-        class_weight="balanced",
+        # Avoid oversubscription on the 80-logical-CPU experiment server.
+        n_jobs=8,
+        class_weight=None,
         verbose=-1,
     )
     return model
 
-def train_model(model, X_train, y_train):
+def train_model(model, X_train, y_train, X_valid=None, y_valid=None):
     print("[INFO] Training LightGBM model...")
+
+    callbacks = [lgb.log_evaluation(period=20)]
+    fit_kwargs = {}
+    if X_valid is not None and y_valid is not None:
+        fit_kwargs["eval_set"] = [(X_valid, y_valid)]
+        fit_kwargs["eval_metric"] = "multi_logloss"
+        callbacks.insert(0, lgb.early_stopping(stopping_rounds=50))
 
     model.fit(
         X_train,
         y_train,
-        eval_set=[(X_train, y_train)],
-        eval_metric="multi_logloss",
-        callbacks=[lgb.log_evaluation(period=20)],
+        callbacks=callbacks,
+        **fit_kwargs,
     )
 
+    if getattr(model, "best_iteration_", None):
+        print(f"[INFO] Best iteration: {model.best_iteration_}")
     print("[INFO] Training complete")
     return model
 
-def save_model(model, model_dir: Path):
+def save_model(
+    model,
+    model_dir: Path,
+    filename: str = "lightgbm_toniot_classification.pkl",
+):
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = model_dir / "lightgbm_toniot_classification.pkl"
+    model_path = model_dir / filename
 
     joblib.dump(model, model_path)
 

@@ -15,15 +15,16 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 @dataclass(slots=True)
 class XAIConfig:
-    """Configuration for SHAP ∩ class-wise CPFI + SHAP interaction (+ LIME)."""
+    """Configuration for SAGE-led full-train feature selection."""
 
     random_state: int = 42
 
-    # Sampling limits. None means use all available rows.
-    shap_max_samples: int | None = 3000
-    interaction_max_samples: int | None = 1000
+    # Full-train computations are batched to control memory usage.
+    shap_batch_size: int = 4096
+    interaction_batch_size: int = 256
+    sage_repeats: int = 1
     cpf_max_samples: int | None = None
-    correlation_max_samples: int | None = 20000
+    correlation_max_samples: int | None = None
 
     # Class-wise conditional permutation feature importance (CPFI).
     cpf_metric: str = "f1"  # one of: f1, precision, recall
@@ -32,9 +33,12 @@ class XAIConfig:
     cpf_n_bins: int = 5
 
     # Consensus selection.
-    top_k_shap: int = 10
-    top_k_cpf: int = 10
+    top_k_sage: int = 14
+    top_k_shap: int = 12
+    top_k_cpf: int = 12
     min_features_per_class: int = 3
+    min_final_features: int = 18
+    max_final_features: int = 20
 
     # SHAP interaction protection.
     enable_interaction: bool = True  # safely auto-skipped if unsupported
@@ -56,6 +60,8 @@ class XAIConfig:
 
 @dataclass(slots=True)
 class XAIResult:
+    global_sage: pd.DataFrame
+    classwise_sage: pd.DataFrame
     global_shap: pd.DataFrame
     classwise_shap: pd.DataFrame
     global_cpf: pd.DataFrame
@@ -285,54 +291,73 @@ def compute_classwise_shap_importance(
     y: pd.Series,
     class_ids: Sequence[Any],
     class_names: Sequence[str],
-    max_samples: int | None,
-    random_state: int,
+    batch_size: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame, Any]:
-    positions = _stratified_positions(y, max_samples, random_state)
-    X_sample = X.iloc[positions].copy()
-    y_sample = y.iloc[positions].reset_index(drop=True)
+    """Compute SHAP importance for every training row in memory-safe batches."""
+    if batch_size <= 0:
+        raise ValueError("shap_batch_size must be positive")
 
     explainer = _make_tree_explainer(model)
-    try:
-        raw_values = explainer.shap_values(X_sample, check_additivity=False)
-    except TypeError:
-        raw_values = explainer.shap_values(X_sample)
+    n_features = X.shape[1]
+    n_classes = len(class_ids)
+    class_to_position = {class_id: i for i, class_id in enumerate(class_ids)}
+    global_sum = np.zeros(n_features, dtype=float)
+    class_sums = np.zeros((n_classes, n_features), dtype=float)
+    class_counts = np.zeros(n_classes, dtype=int)
 
-    values = _normalize_shap_values(
-        raw_values,
-        n_samples=len(X_sample),
-        n_features=X_sample.shape[1],
-        n_outputs=len(class_ids),
-    )
+    print(f"[INFO] Computing full-train SHAP for {len(X):,} rows...")
+    for start in range(0, len(X), batch_size):
+        stop = min(start + batch_size, len(X))
+        X_batch = X.iloc[start:stop]
+        y_batch = y.iloc[start:stop].to_numpy()
+        try:
+            raw_values = explainer.shap_values(X_batch, check_additivity=False)
+        except TypeError:
+            raw_values = explainer.shap_values(X_batch)
 
-    if values.shape[-1] != len(class_ids):
-        raise ValueError(
-            "The number of SHAP output dimensions does not match model.classes_. "
-            f"SHAP outputs={values.shape[-1]}, classes={len(class_ids)}"
+        values = _normalize_shap_values(
+            raw_values,
+            n_samples=len(X_batch),
+            n_features=n_features,
+            n_outputs=n_classes,
         )
+        if values.shape[-1] != n_classes:
+            raise ValueError(
+                "The number of SHAP output dimensions does not match "
+                f"model.classes_: outputs={values.shape[-1]}, classes={n_classes}"
+            )
 
-    global_values = np.mean(np.abs(values), axis=(0, 2))
+        absolute = np.abs(values)
+        global_sum += absolute.sum(axis=(0, 2))
+        for class_id, class_position in class_to_position.items():
+            mask = y_batch == class_id
+            if np.any(mask):
+                class_sums[class_position] += absolute[
+                    mask, :, class_position
+                ].sum(axis=0)
+                class_counts[class_position] += int(mask.sum())
+
+        if stop == len(X) or stop % (batch_size * 10) == 0:
+            print(f"[INFO] SHAP progress: {stop:,}/{len(X):,}")
+
+    global_values = global_sum / (len(X) * n_classes)
     global_df = pd.DataFrame(
         {
-            "feature": X_sample.columns,
+            "feature": X.columns,
             "mean_abs_shap": global_values,
         }
     ).sort_values("mean_abs_shap", ascending=False, ignore_index=True)
     global_df["rank"] = np.arange(1, len(global_df) + 1)
 
     rows: list[dict[str, Any]] = []
-    y_values = y_sample.to_numpy()
     for output_position, (class_id, class_name) in enumerate(
         zip(class_ids, class_names, strict=True)
     ):
-        mask = y_values == class_id
-        if not np.any(mask):
-            warnings.warn(f"No SHAP sample exists for class {class_id!r}")
+        if class_counts[output_position] == 0:
+            warnings.warn(f"No SHAP training row exists for class {class_id!r}")
             continue
-
-        class_importance = np.mean(
-            np.abs(values[mask, :, output_position]),
-            axis=0,
+        class_importance = (
+            class_sums[output_position] / class_counts[output_position]
         )
         order = np.argsort(-class_importance)
         for rank, feature_position in enumerate(order, start=1):
@@ -340,14 +365,156 @@ def compute_classwise_shap_importance(
                 {
                     "class_id": class_id,
                     "class_name": class_name,
-                    "feature": X_sample.columns[feature_position],
+                    "feature": X.columns[feature_position],
                     "mean_abs_shap": float(class_importance[feature_position]),
                     "rank_shap": rank,
-                    "class_samples": int(mask.sum()),
+                    "class_samples": int(class_counts[output_position]),
                 }
             )
 
     return global_df, pd.DataFrame(rows), explainer
+
+
+def compute_classwise_sage_importance(
+    model: Any,
+    X: pd.DataFrame,
+    y: pd.Series,
+    class_ids: Sequence[Any],
+    class_names: Sequence[str],
+    repeats: int,
+    random_state: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Estimate class-balanced SAGE with every training row.
+
+    This follows the permutation SAGE estimator, but replaces its default
+    bootstrap row sampling with full passes over the training set. Missing
+    features are marginalized with a random donor permutation of the same
+    training set. Each class uses a balanced one-vs-rest binary cross-entropy
+    loss, so minority and majority classes receive equal weight.
+    """
+    try:
+        import sage  # noqa: F401 - dependency and method provenance check
+    except ImportError as exc:
+        raise ImportError(
+            "SAGE selection requires 'sage-importance'. Install it with: "
+            "pip install sage-importance"
+        ) from exc
+
+    if repeats <= 0:
+        raise ValueError("sage_repeats must be positive")
+
+    X_values = X.to_numpy(copy=True)
+    y_values = y.to_numpy()
+    n_rows, n_features = X_values.shape
+    n_classes = len(class_ids)
+    class_to_position = {class_id: i for i, class_id in enumerate(class_ids)}
+    try:
+        y_positions = np.fromiter(
+            (class_to_position[value] for value in y_values),
+            dtype=int,
+            count=n_rows,
+        )
+    except KeyError as exc:
+        raise ValueError(f"Unknown class id in y_reference: {exc.args[0]!r}") from exc
+
+    targets = np.equal.outer(y_positions, np.arange(n_classes)).astype(float)
+    positive_counts = targets.sum(axis=0)
+    negative_counts = n_rows - positive_counts
+    if np.any(positive_counts == 0) or np.any(negative_counts == 0):
+        raise ValueError("Each SAGE class requires positive and negative rows")
+    weights = np.where(
+        targets == 1,
+        0.5 / positive_counts,
+        0.5 / negative_counts,
+    )
+
+    rng = np.random.default_rng(random_state)
+    repeat_values = np.zeros((repeats, n_classes, n_features), dtype=float)
+    row_positions = np.arange(n_rows)
+
+    def predict_probabilities(values: np.ndarray) -> np.ndarray:
+        frame = pd.DataFrame(values, columns=X.columns, copy=False)
+        return np.asarray(model.predict_proba(frame))
+
+    def balanced_binary_losses(probabilities: np.ndarray) -> np.ndarray:
+        clipped = np.clip(probabilities, 1e-12, 1 - 1e-12)
+        return -(
+            targets * np.log(clipped)
+            + (1 - targets) * np.log1p(-clipped)
+        )
+
+    print(
+        f"[INFO] Computing full-train class-balanced SAGE for "
+        f"{n_rows:,} rows and {n_features} features..."
+    )
+    for repeat in range(repeats):
+        donor_positions = rng.permutation(n_rows)
+        revealed = X_values[donor_positions].copy()
+        feature_orders = np.argsort(
+            rng.random((n_rows, n_features)),
+            axis=1,
+        )
+        previous_loss = balanced_binary_losses(predict_probabilities(revealed))
+
+        for step in range(n_features):
+            revealed_features = feature_orders[:, step]
+            revealed[row_positions, revealed_features] = X_values[
+                row_positions, revealed_features
+            ]
+            current_loss = balanced_binary_losses(predict_probabilities(revealed))
+            contributions = (previous_loss - current_loss) * weights
+
+            for class_position in range(n_classes):
+                np.add.at(
+                    repeat_values[repeat, class_position],
+                    revealed_features,
+                    contributions[:, class_position],
+                )
+            previous_loss = current_loss
+
+            if step == n_features - 1 or (step + 1) % 5 == 0:
+                print(
+                    f"[INFO] SAGE repeat {repeat + 1}/{repeats}: "
+                    f"{step + 1}/{n_features} features revealed"
+                )
+
+    class_values = repeat_values.mean(axis=0)
+    class_std = repeat_values.std(axis=0, ddof=0)
+    class_rows: list[dict[str, Any]] = []
+    for class_position, (class_id, class_name) in enumerate(
+        zip(class_ids, class_names, strict=True)
+    ):
+        order = np.argsort(-class_values[class_position])
+        for rank, feature_position in enumerate(order, start=1):
+            class_rows.append(
+                {
+                    "class_id": class_id,
+                    "class_name": class_name,
+                    "feature": X.columns[feature_position],
+                    "sage_importance": float(
+                        class_values[class_position, feature_position]
+                    ),
+                    "sage_repeat_std": float(
+                        class_std[class_position, feature_position]
+                    ),
+                    "rank_sage": rank,
+                    "positive_samples": int(positive_counts[class_position]),
+                    "negative_samples": int(negative_counts[class_position]),
+                    "repeats": repeats,
+                }
+            )
+
+    macro_values = class_values.mean(axis=0)
+    macro_std = repeat_values.mean(axis=1).std(axis=0, ddof=0)
+    global_df = pd.DataFrame(
+        {
+            "feature": X.columns,
+            "macro_sage_importance": macro_values,
+            "sage_repeat_std": macro_std,
+        }
+    ).sort_values("macro_sage_importance", ascending=False, ignore_index=True)
+    global_df["rank_sage"] = np.arange(1, len(global_df) + 1)
+    return global_df, pd.DataFrame(class_rows)
 
 
 def _metric_per_class(
@@ -495,7 +662,7 @@ def compute_classwise_conditional_permutation_importance(
     rng = np.random.default_rng(config.random_state)
     rows: list[dict[str, Any]] = []
 
-    for feature in X_sample.columns:
+    for feature_position, feature in enumerate(X_sample.columns, start=1):
         conditioners = conditioners_by_feature[feature]
         groups = _group_codes(X_sample, conditioners, config.cpf_n_bins)
         repeat_scores: list[np.ndarray] = []
@@ -538,6 +705,11 @@ def compute_classwise_conditional_permutation_importance(
                 }
             )
 
+        print(
+            f"[INFO] CPF progress: {feature_position}/{X_sample.shape[1]} "
+            f"({feature})"
+        )
+
     classwise_df = pd.DataFrame(rows)
     classwise_df["rank_cpf"] = (
         classwise_df.groupby("class_id")["cpf_importance_mean"]
@@ -571,63 +743,77 @@ def compute_classwise_shap_interactions(
     y: pd.Series,
     class_ids: Sequence[Any],
     class_names: Sequence[str],
-    max_samples: int | None,
-    random_state: int,
+    batch_size: int,
 ) -> pd.DataFrame:
-    """Compute class-wise SHAP interactions when output-specific tensors exist.
+    """Compute full-train class-wise SHAP interactions in batches.
 
     A single interaction tensor returned for a multiclass model is not copied
     across classes because that would create artificial class-wise results.
     In that case, interaction-based feature protection is skipped while the
     class-wise SHAP and CPFI stages continue normally.
     """
-    positions = _stratified_positions(y, max_samples, random_state)
-    X_sample = X.iloc[positions].copy()
-    y_sample = y.iloc[positions].reset_index(drop=True)
+    if batch_size <= 0:
+        raise ValueError("interaction_batch_size must be positive")
 
-    try:
-        raw_values = explainer.shap_interaction_values(X_sample)
-        values = _normalize_interaction_values(
-            raw_values,
-            n_samples=len(X_sample),
-            n_features=X_sample.shape[1],
-            n_outputs=len(class_ids),
-        )
-    except Exception as error:
-        print(
-            "[INFO] SHAP interaction analysis skipped because interaction "
-            f"values could not be computed safely: {type(error).__name__}: "
-            f"{error}"
-        )
-        return _empty_interaction_frame()
+    n_features = X.shape[1]
+    n_classes = len(class_ids)
+    class_to_position = {class_id: i for i, class_id in enumerate(class_ids)}
+    class_sums = np.zeros(
+        (n_classes, n_features, n_features),
+        dtype=float,
+    )
+    class_counts = np.zeros(n_classes, dtype=int)
 
-    interaction_outputs = values.shape[-1]
-    expected_outputs = len(class_ids)
+    print(f"[INFO] Computing full-train SHAP interactions for {len(X):,} rows...")
+    for start in range(0, len(X), batch_size):
+        stop = min(start + batch_size, len(X))
+        X_batch = X.iloc[start:stop]
+        y_batch = y.iloc[start:stop].to_numpy()
+        try:
+            raw_values = explainer.shap_interaction_values(X_batch)
+            values = _normalize_interaction_values(
+                raw_values,
+                n_samples=len(X_batch),
+                n_features=n_features,
+                n_outputs=n_classes,
+            )
+        except Exception as error:
+            print(
+                "[INFO] SHAP interaction analysis skipped because interaction "
+                f"values could not be computed safely: {type(error).__name__}: "
+                f"{error}"
+            )
+            return _empty_interaction_frame()
 
-    if interaction_outputs != expected_outputs:
-        print(
-            "[INFO] SHAP interaction analysis skipped: the explainer returned "
-            f"{interaction_outputs} interaction output(s) for a "
-            f"{expected_outputs}-class model. The tensor will not be repeated "
-            "because doing so would produce invalid class-wise interactions."
-        )
-        return _empty_interaction_frame()
+        if values.shape[-1] != n_classes:
+            print(
+                "[INFO] SHAP interaction analysis skipped: the explainer "
+                f"returned {values.shape[-1]} interaction output(s) for a "
+                f"{n_classes}-class model. The tensor will not be repeated "
+                "because doing so would produce invalid class-wise interactions."
+            )
+            return _empty_interaction_frame()
+
+        absolute = np.abs(values)
+        for class_id, class_position in class_to_position.items():
+            mask = y_batch == class_id
+            if np.any(mask):
+                class_sums[class_position] += absolute[
+                    mask, :, :, class_position
+                ].sum(axis=0)
+                class_counts[class_position] += int(mask.sum())
+
+        if stop == len(X) or stop % (batch_size * 20) == 0:
+            print(f"[INFO] Interaction progress: {stop:,}/{len(X):,}")
 
     rows: list[dict[str, Any]] = []
-    y_values = y_sample.to_numpy()
-    features = list(X_sample.columns)
-
+    features = list(X.columns)
     for output_position, (class_id, class_name) in enumerate(
         zip(class_ids, class_names, strict=True)
     ):
-        mask = y_values == class_id
-        if not np.any(mask):
+        if class_counts[output_position] == 0:
             continue
-
-        matrix = np.mean(
-            np.abs(values[mask, :, :, output_position]),
-            axis=0,
-        )
+        matrix = class_sums[output_position] / class_counts[output_position]
 
         pairs: list[tuple[float, int, int]] = []
 
@@ -651,7 +837,7 @@ def compute_classwise_shap_interactions(
                     "feature_2": features[second],
                     "mean_abs_interaction": importance,
                     "rank_interaction": rank,
-                    "class_samples": int(mask.sum()),
+                    "class_samples": int(class_counts[output_position]),
                 }
             )
 
@@ -789,16 +975,27 @@ def build_consensus_selection(
     feature_order: Sequence[str],
     class_ids: Sequence[Any],
     class_names: Sequence[str],
+    global_sage: pd.DataFrame,
+    classwise_sage: pd.DataFrame,
     classwise_shap: pd.DataFrame,
     classwise_cpf: pd.DataFrame,
     interactions: pd.DataFrame,
     lime_aggregate: pd.DataFrame,
     config: XAIConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Select a SAGE core, then add class and interaction protection."""
     score_rows: list[pd.DataFrame] = []
-    selected_rows: list[dict[str, Any]] = []
+    class_candidates: dict[Any, list[str]] = {}
+    strict_by_class: dict[Any, set[str]] = {}
+    consensus_lookup: dict[tuple[Any, str], float] = {}
+    class_name_lookup = dict(zip(class_ids, class_names, strict=True))
+    macro_sage = global_sage.set_index("feature")["macro_sage_importance"]
+    macro_rank = global_sage.set_index("feature")["rank_sage"]
 
     for class_id, class_name in zip(class_ids, class_names, strict=True):
+        sage_part = classwise_sage[classwise_sage["class_id"] == class_id][
+            ["feature", "sage_importance", "rank_sage"]
+        ]
         shap_part = classwise_shap[classwise_shap["class_id"] == class_id][
             ["feature", "mean_abs_shap", "rank_shap"]
         ]
@@ -806,8 +1003,11 @@ def build_consensus_selection(
             ["feature", "cpf_importance_mean", "rank_cpf"]
         ]
         merged = pd.DataFrame({"feature": list(feature_order)})
+        merged = merged.merge(sage_part, on="feature", how="left")
         merged = merged.merge(shap_part, on="feature", how="left")
         merged = merged.merge(cpf_part, on="feature", how="left")
+        merged["macro_sage_importance"] = merged["feature"].map(macro_sage)
+        merged["macro_sage_rank"] = merged["feature"].map(macro_rank)
         merged["class_id"] = class_id
         merged["class_name"] = class_name
         merged["shap_top_k"] = merged["rank_shap"] <= config.top_k_shap
@@ -829,88 +1029,155 @@ def build_consensus_selection(
         merged["consensus_score"] = (
             0.5 * merged["shap_normalized"] + 0.5 * merged["cpf_normalized"]
         )
-
-        selected_sources: dict[str, set[str]] = {}
-        strict_features = merged.loc[merged["strict_intersection"], "feature"].tolist()
-        for feature in strict_features:
-            selected_sources.setdefault(feature, set()).add("shap_intersection_cpf")
-
-        if len(selected_sources) < config.min_features_per_class:
-            candidates = merged.sort_values("consensus_score", ascending=False)
-            for feature in candidates["feature"]:
-                selected_sources.setdefault(feature, set()).add("consensus_fill")
-                if len(selected_sources) >= config.min_features_per_class:
+        strict = merged.loc[merged["strict_intersection"]].sort_values(
+            "consensus_score",
+            ascending=False,
+        )["feature"].tolist()
+        candidates = list(strict)
+        if len(candidates) < config.min_features_per_class:
+            for feature in merged.sort_values(
+                "consensus_score",
+                ascending=False,
+            )["feature"]:
+                if feature not in candidates:
+                    candidates.append(feature)
+                if len(candidates) >= config.min_features_per_class:
                     break
-
-        if config.enable_interaction and not interactions.empty:
-            pair_rows = interactions[
-                (interactions["class_id"] == class_id)
-                & (
-                    interactions["rank_interaction"]
-                    <= config.top_interaction_pairs_per_class
-                )
-            ]
-            for row in pair_rows.itertuples(index=False):
-                first_selected = row.feature_1 in selected_sources
-                second_selected = row.feature_2 in selected_sources
-
-                if first_selected and second_selected:
-                    selected_sources[row.feature_1].add("shap_interaction")
-                    selected_sources[row.feature_2].add("shap_interaction")
-                elif first_selected:
-                    selected_sources.setdefault(row.feature_2, set()).add(
-                        "shap_interaction_partner"
-                    )
-                elif second_selected:
-                    selected_sources.setdefault(row.feature_1, set()).add(
-                        "shap_interaction_partner"
-                    )
-                elif config.interaction_add_orphan_pairs:
-                    selected_sources.setdefault(row.feature_1, set()).add(
-                        "shap_interaction_orphan_pair"
-                    )
-                    selected_sources.setdefault(row.feature_2, set()).add(
-                        "shap_interaction_orphan_pair"
-                    )
-
-        if (
-            config.enable_lime
-            and config.include_lime_in_selection
-            and not lime_aggregate.empty
-        ):
-            lime_rows = lime_aggregate[
-                (lime_aggregate["explained_class_id"] == class_id)
-                & (
-                    lime_aggregate["rank_lime"]
-                    <= config.top_lime_features_per_class
-                )
-            ]
-            for feature in lime_rows["feature"]:
-                selected_sources.setdefault(feature, set()).add("lime")
-
-        for feature, sources in selected_sources.items():
-            feature_score = merged.loc[merged["feature"] == feature].iloc[0]
-            selected_rows.append(
-                {
-                    "class_id": class_id,
-                    "class_name": class_name,
-                    "feature": feature,
-                    "selection_sources": ";".join(sorted(sources)),
-                    "mean_abs_shap": feature_score["mean_abs_shap"],
-                    "cpf_importance_mean": feature_score["cpf_importance_mean"],
-                    "consensus_score": feature_score["consensus_score"],
-                }
-            )
-
+        class_candidates[class_id] = candidates
+        strict_by_class[class_id] = set(strict)
+        for row in merged.itertuples(index=False):
+            consensus_lookup[(class_id, row.feature)] = float(row.consensus_score)
         score_rows.append(merged)
 
     scores_df = pd.concat(score_rows, ignore_index=True)
-    selected_df = pd.DataFrame(selected_rows).sort_values(
-        ["class_id", "consensus_score"],
-        ascending=[True, False],
-        ignore_index=True,
-    )
-    selected_set = set(selected_df["feature"])
+    selected_sources: dict[str, set[str]] = {}
+    protected_classes: dict[str, set[str]] = {}
+
+    for feature in global_sage.head(config.top_k_sage)["feature"]:
+        selected_sources.setdefault(feature, set()).add("macro_sage_core")
+
+    def coverage(class_id: Any) -> int:
+        return sum(
+            feature in selected_sources
+            for feature in class_candidates[class_id]
+        )
+
+    while len(selected_sources) < config.max_final_features:
+        deficient = [
+            class_id
+            for class_id in class_ids
+            if coverage(class_id) < config.min_features_per_class
+        ]
+        if not deficient:
+            break
+
+        ranked_candidates: list[tuple[int, float, float, str]] = []
+        for feature in feature_order:
+            if feature in selected_sources:
+                continue
+            covered = [
+                class_id
+                for class_id in deficient
+                if feature in class_candidates[class_id]
+            ]
+            if not covered:
+                continue
+            consensus = float(
+                np.mean(
+                    [consensus_lookup[(class_id, feature)] for class_id in covered]
+                )
+            )
+            ranked_candidates.append(
+                (
+                    len(covered),
+                    consensus,
+                    float(macro_sage.get(feature, -np.inf)),
+                    feature,
+                )
+            )
+        if not ranked_candidates:
+            break
+        _, _, _, selected_feature = max(ranked_candidates)
+        selected_sources.setdefault(selected_feature, set()).add(
+            "classwise_shap_cpf_protection"
+        )
+
+    for class_id in class_ids:
+        class_name = class_name_lookup[class_id]
+        for feature in class_candidates[class_id]:
+            if feature not in selected_sources:
+                continue
+            protected_classes.setdefault(feature, set()).add(class_name)
+            if feature in strict_by_class[class_id]:
+                selected_sources[feature].add("shap_intersection_cpf")
+            else:
+                selected_sources[feature].add("class_consensus_fill")
+
+    if len(selected_sources) < config.min_final_features:
+        for feature in global_sage["feature"]:
+            if feature not in selected_sources:
+                selected_sources[feature] = {"macro_sage_floor"}
+            if len(selected_sources) >= config.min_final_features:
+                break
+
+    if config.enable_interaction and not interactions.empty:
+        pair_candidates = interactions[
+            interactions["rank_interaction"]
+            <= config.top_interaction_pairs_per_class
+        ].sort_values("mean_abs_interaction", ascending=False)
+        for row in pair_candidates.itertuples(index=False):
+            if len(selected_sources) >= config.max_final_features:
+                break
+            first_selected = row.feature_1 in selected_sources
+            second_selected = row.feature_2 in selected_sources
+            if first_selected == second_selected:
+                continue
+            partner = row.feature_2 if first_selected else row.feature_1
+            selected_sources.setdefault(partner, set()).add(
+                "shap_interaction_partner"
+            )
+            protected_classes.setdefault(partner, set()).add(row.class_name)
+
+    if (
+        config.enable_lime
+        and config.include_lime_in_selection
+        and not lime_aggregate.empty
+    ):
+        for feature in lime_aggregate.sort_values(
+            "mean_abs_lime",
+            ascending=False,
+        )["feature"]:
+            if feature in selected_sources:
+                selected_sources[feature].add("lime")
+
+    uncovered = {
+        class_name_lookup[class_id]: coverage(class_id)
+        for class_id in class_ids
+        if coverage(class_id) < config.min_features_per_class
+    }
+    if uncovered:
+        warnings.warn(
+            "The maximum feature budget prevented full class protection: "
+            f"{uncovered}"
+        )
+
+    selected_rows = []
+    for feature in global_sage["feature"]:
+        if feature not in selected_sources:
+            continue
+        selected_rows.append(
+            {
+                "feature": feature,
+                "selection_sources": ";".join(sorted(selected_sources[feature])),
+                "protected_classes": ";".join(
+                    sorted(protected_classes.get(feature, set()))
+                ),
+                "macro_sage_importance": float(macro_sage[feature]),
+                "rank_sage": int(macro_rank[feature]),
+            }
+        )
+    selected_df = pd.DataFrame(selected_rows)
+    selected_set = set(selected_sources)
     final_features = [feature for feature in feature_order if feature in selected_set]
     return scores_df, selected_df, final_features
 
@@ -948,14 +1215,27 @@ def save_xai_reports(
     output_dir: Path,
     config: XAIConfig,
 ) -> None:
+    sage_dir = output_dir / "sage"
     shap_dir = output_dir / "shap"
     cpf_dir = output_dir / "cpf"
     interaction_dir = output_dir / "interaction"
     lime_dir = output_dir / "lime"
     selection_dir = output_dir / "selection"
-    for directory in [shap_dir, cpf_dir, interaction_dir, lime_dir, selection_dir]:
+    for directory in [
+        sage_dir,
+        shap_dir,
+        cpf_dir,
+        interaction_dir,
+        lime_dir,
+        selection_dir,
+    ]:
         directory.mkdir(parents=True, exist_ok=True)
 
+    result.global_sage.to_csv(sage_dir / "macro_sage_importance.csv", index=False)
+    result.classwise_sage.to_csv(
+        sage_dir / "classwise_sage_importance.csv",
+        index=False,
+    )
     result.global_shap.to_csv(shap_dir / "global_shap_importance.csv", index=False)
     result.classwise_shap.to_csv(
         shap_dir / "classwise_shap_importance.csv",
@@ -992,6 +1272,14 @@ def save_xai_reports(
         encoding="utf-8",
     )
 
+    _save_bar_plot(
+        result.global_sage,
+        "feature",
+        "macro_sage_importance",
+        sage_dir / "macro_sage_importance.png",
+        "Class-balanced Macro-SAGE Importance",
+        config.plot_top_n,
+    )
     _save_bar_plot(
         result.global_shap,
         "feature",
@@ -1036,6 +1324,9 @@ def save_xai_reports(
 
     readme = """XAI report layout
 =================
+sage/
+  macro_sage_importance.csv
+  classwise_sage_importance.csv
 shap/
   global_shap_importance.csv
   classwise_shap_importance.csv
@@ -1054,14 +1345,20 @@ selection/
 
 Selection rule
 --------------
-1. Strictly select the intersection of class-wise SHAP top-k and positive
-   class-wise CPFI top-k.
-2. If a class has too few intersecting features, fill by the combined
-   normalized SHAP/CPFI consensus score.
-3. Protect a missing partner when valid output-specific class-wise SHAP
-   interaction tensors are available. Unsupported multiclass interaction
-   outputs are skipped rather than duplicated across classes.
-4. Optionally add top local LIME features when include_lime_in_selection=True.
+1. Select the class-balanced Macro-SAGE top-k as the core feature set.
+2. Add class protection from the intersection of class-wise SHAP top-k and
+   positive class-wise CPFI top-k, with consensus fallback where necessary.
+3. Fill to min_final_features in Macro-SAGE rank order.
+4. Protect missing partners from valid class-wise SHAP interaction pairs up to
+   max_final_features. Unsupported multiclass interaction output is skipped.
+5. LIME is optional and is not part of automatic feature selection by default.
+
+SAGE note
+---------
+All training rows participate in every repeat. Missing features use a random
+donor permutation of the same training set. Per-class one-vs-rest binary
+cross-entropy contributions are balanced 50/50 between positive and negative
+rows, then averaged equally across classes to obtain Macro-SAGE.
 
 CPFI note
 ---------
@@ -1082,11 +1379,11 @@ def run_xai_analysis(
     output_dir: str | Path,
     config: XAIConfig | None = None,
 ) -> XAIResult:
-    """Run SHAP ∩ class-wise CPFI + SHAP interaction (+ optional LIME).
+    """Run full-train SAGE-led feature selection.
 
-    X_reference should be training data used to estimate correlations and to
-    initialize LIME. X_eval should be a validation set, not the final test set,
-    when the resulting feature list will be used for model selection.
+    X_reference and y_reference must be the complete training split used to fit
+    the model. X_eval and y_eval are used only for optional LIME error analysis;
+    they should be validation data, never the final test set.
     """
     config = config or XAIConfig()
     output_path = Path(output_dir)
@@ -1104,21 +1401,30 @@ def run_xai_analysis(
             f"classes={class_ids}, class_names={list(class_names)}"
         )
 
-    global_shap, classwise_shap, explainer = compute_classwise_shap_importance(
+    global_sage, classwise_sage = compute_classwise_sage_importance(
         model=model,
-        X=X_eval,
-        y=y_eval,
+        X=X_reference,
+        y=y_reference,
         class_ids=class_ids,
         class_names=class_names,
-        max_samples=config.shap_max_samples,
+        repeats=config.sage_repeats,
         random_state=config.random_state,
+    )
+
+    global_shap, classwise_shap, explainer = compute_classwise_shap_importance(
+        model=model,
+        X=X_reference,
+        y=y_reference,
+        class_ids=class_ids,
+        class_names=class_names,
+        batch_size=config.shap_batch_size,
     )
 
     global_cpf, classwise_cpf = compute_classwise_conditional_permutation_importance(
         model=model,
         X_reference=X_reference,
-        X_eval=X_eval,
-        y_eval=y_eval,
+        X_eval=X_reference,
+        y_eval=y_reference,
         class_ids=class_ids,
         class_names=class_names,
         config=config,
@@ -1127,12 +1433,11 @@ def run_xai_analysis(
     if config.enable_interaction:
         interactions = compute_classwise_shap_interactions(
             explainer=explainer,
-            X=X_eval,
-            y=y_eval,
+            X=X_reference,
+            y=y_reference,
             class_ids=class_ids,
             class_names=class_names,
-            max_samples=config.interaction_max_samples,
-            random_state=config.random_state,
+            batch_size=config.interaction_batch_size,
         )
     else:
         interactions = pd.DataFrame()
@@ -1155,6 +1460,8 @@ def run_xai_analysis(
         feature_order=list(X_reference.columns),
         class_ids=class_ids,
         class_names=class_names,
+        global_sage=global_sage,
+        classwise_sage=classwise_sage,
         classwise_shap=classwise_shap,
         classwise_cpf=classwise_cpf,
         interactions=interactions,
@@ -1163,6 +1470,8 @@ def run_xai_analysis(
     )
 
     result = XAIResult(
+        global_sage=global_sage,
+        classwise_sage=classwise_sage,
         global_shap=global_shap,
         classwise_shap=classwise_shap,
         global_cpf=global_cpf,

@@ -1,0 +1,174 @@
+[INFO] Processed dataset already exists: data_network/processed_type
+[INFO] Processed data loaded
+[INFO] X_train: (147729, 22)
+[INFO] X_valid: (31657, 22)
+[INFO] X_test : (31657, 22)
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.327857
+[40]	valid_0's multi_logloss: 0.11732
+[60]	valid_0's multi_logloss: 0.0757493
+[80]	valid_0's multi_logloss: 0.0652275
+[100]	valid_0's multi_logloss: 0.0616268
+[120]	valid_0's multi_logloss: 0.0603212
+[140]	valid_0's multi_logloss: 0.0595566
+[160]	valid_0's multi_logloss: 0.0590481
+[180]	valid_0's multi_logloss: 0.0587597
+[200]	valid_0's multi_logloss: 0.058604
+[220]	valid_0's multi_logloss: 0.0585484
+[240]	valid_0's multi_logloss: 0.0586193
+[260]	valid_0's multi_logloss: 0.0588069
+Early stopping, best iteration is:
+[227]	valid_0's multi_logloss: 0.0585262
+[INFO] Best iteration: 227
+[INFO] Training complete
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.327857
+[40]	valid_0's multi_logloss: 0.11732
+[60]	valid_0's multi_logloss: 0.0757493
+[80]	valid_0's multi_logloss: 0.0652275
+[100]	valid_0's multi_logloss: 0.0616268
+[120]	valid_0's multi_logloss: 0.0603212
+[140]	valid_0's multi_logloss: 0.0595566
+[160]	valid_0's multi_logloss: 0.0590481
+[180]	valid_0's multi_logloss: 0.0587597
+[200]	valid_0's multi_logloss: 0.058604
+[220]	valid_0's multi_logloss: 0.0585484
+[240]	valid_0's multi_logloss: 0.0586193
+[260]	valid_0's multi_logloss: 0.0588069
+Early stopping, best iteration is:
+[227]	valid_0's multi_logloss: 0.0585262
+[INFO] Best iteration: 227
+[INFO] Training complete
+[INFO] Computing full-train class-balanced SAGE for 147,729 rows and 22 features...
+[INFO] SAGE repeat 1/1: 5/22 features revealed
+[INFO] SAGE repeat 1/1: 10/22 features revealed
+[INFO] SAGE repeat 1/1: 15/22 features revealed
+[INFO] SAGE repeat 1/1: 20/22 features revealed
+[INFO] SAGE repeat 1/1: 22/22 features revealed
+[INFO] Computing full-train SHAP for 147,729 rows...
+[INFO] SHAP progress: 40,960/147,729
+[INFO] SHAP progress: 81,920/147,729
+[INFO] SHAP progress: 122,880/147,729
+[INFO] SHAP progress: 147,729/147,729
+[INFO] Computing full-train SHAP interactions for 147,729 rows...
+[INFO] SHAP interaction analysis skipped: the explainer returned 1 interaction output(s) for a 10-class model. The tensor will not be repeated because doing so would produce invalid class-wise interactions.
+
+========== XAI Feature Selection ==========
+Selected 18 / 22 features
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_qclass', 'dns_qtype', 'dns_rcode', 'dns_AA', 'dns_RD', 'dns_RA', 'dns_rejected']
+[INFO] XAI reports saved to: reports/lightgbm_260805/xai/reduction_1
+[INFO] Reduction-1 selected features (18):
+['proto', 'service', 'duration', 'src_bytes', 'dst_bytes', 'conn_state', 'src_pkts', 'src_ip_bytes', 'dst_pkts', 'dst_ip_bytes', 'dns_query', 'dns_qclass', 'dns_qtype', 'dns_rcode', 'dns_AA', 'dns_RD', 'dns_RA', 'dns_rejected']
+[INFO] Training LightGBM model...
+Training until validation scores don't improve for 50 rounds
+[20]	valid_0's multi_logloss: 0.330272
+[40]	valid_0's multi_logloss: 0.119949
+[60]	valid_0's multi_logloss: 0.0767662
+[80]	valid_0's multi_logloss: 0.065762
+[100]	valid_0's multi_logloss: 0.0619341
+[120]	valid_0's multi_logloss: 0.0602134
+[140]	valid_0's multi_logloss: 0.0593061
+[160]	valid_0's multi_logloss: 0.0588078
+[180]	valid_0's multi_logloss: 0.0584025
+[200]	valid_0's multi_logloss: 0.0582233
+[220]	valid_0's multi_logloss: 0.0582309
+[240]	valid_0's multi_logloss: 0.0582793
+Early stopping, best iteration is:
+[203]	valid_0's multi_logloss: 0.0582011
+[INFO] Best iteration: 203
+[INFO] Training complete
+
+========== Validation Comparison ==========
+         model  accuracy  precision_macro  recall_macro  f1_macro  mitm_recall
+   baseline_22  0.980257         0.956866      0.959628  0.958059     0.789809
+reduction_1_18  0.980131         0.956184      0.958931  0.957370     0.783439
+
+========== Reduction-1 Acceptance ==========
+ accepted  selected_feature_count  accuracy_drop  macro_f1_drop  mitm_recall_drop
+     True                      18       0.000126       0.000689          0.006369
+
+========== Evaluation Results ==========
+accuracy: 0.978172
+precision_macro: 0.955566
+recall_macro: 0.956200
+f1_macro: 0.955692
+total_inference_time_sec: 2.042198
+avg_inference_time_ms: 0.064510
+throughput_samples_per_sec: 15501.437774
+
+========== Classification Report ==========
+              precision    recall  f1-score   support
+
+           0     0.9997    1.0000    0.9998      3000
+           1     0.9909    0.9760    0.9834      3000
+           2     0.9909    0.9803    0.9856      3000
+           3     0.9830    0.9657    0.9743      3000
+           4     0.7625    0.7771    0.7697       157
+           5     0.9960    0.9976    0.9968      7500
+           6     0.9936    0.9800    0.9867      3000
+           7     0.9086    0.9803    0.9431      3000
+           8     0.9864    0.9923    0.9894      3000
+           9     0.9441    0.9127    0.9281      3000
+
+    accuracy                         0.9782     31657
+   macro avg     0.9556    0.9562    0.9557     31657
+weighted avg     0.9787    0.9782    0.9782     31657
+
+
+========== Confusion Matrix ==========
+[[3000    0    0    0    0    0    0    0    0    0]
+ [   0 2928    1   11    1    2    0   38    0   19]
+ [   0    0 2941    0   15    8    7    2   27    0]
+ [   0   16    0 2897    4    7    0    1   11   64]
+ [   0    1   12    2  122   11    6    0    1    2]
+ [   1    0    2    2    2 7482    2    1    0    8]
+ [   0    0    1    2   11    1 2940   33    2   10]
+ [   0    0    0    0    0    0    0 2941    0   59]
+ [   0    0    9    4    5    0    4    1 2977    0]
+ [   0   10    2   29    0    1    0  220    0 2738]]
+
+========== Batch Inference Time ==========
+Total inference time: 2.042198 sec
+Average inference time: 0.064510 ms/sample
+Throughput: 15501.44 samples/sec
+
+========== Class-wise Inference Time ==========
+   class_id  samples  total_inference_time_sec  avg_inference_time_ms
+0         0     3000                  0.084095               0.028032
+1         1     3000                  0.110470               0.036823
+2         2     3000                  0.089626               0.029875
+3         3     3000                  0.112865               0.037622
+4         4      157                  0.007509               0.047831
+5         5     7500                  0.228849               0.030513
+6         6     3000                  0.109016               0.036339
+7         7     3000                  0.089680               0.029893
+8         8     3000                  0.093138               0.031046
+9         9     3000                  0.100880               0.033627
+[INFO] Confusion matrix plot saved to: reports/lightgbm_260805/reduction_1/confusion_matrix.png
+[INFO] Reports saved to: reports/lightgbm_260805/reduction_1
+
+========== Top 20 Feature Importance ==========
+         feature  split_importance  gain_importance
+7   src_ip_bytes             10052     2.133004e+06
+5     conn_state              5011     8.152925e+05
+3      src_bytes              4946     7.089175e+05
+9   dst_ip_bytes              6117     5.576732e+05
+2       duration             12716     5.113067e+05
+6       src_pkts              4505     4.403910e+05
+0          proto              1268     3.873125e+05
+4      dst_bytes              5062     3.554873e+05
+8       dst_pkts              3428     2.892770e+05
+10     dns_query              4155     9.420296e+04
+1        service              1540     6.815705e+04
+17  dns_rejected               245     2.493230e+04
+13     dns_rcode               370     1.488370e+04
+16        dns_RA               316     1.415778e+04
+14        dns_AA               370     1.331055e+04
+11    dns_qclass                64     6.103144e+03
+15        dns_RD               271     4.710264e+03
+12     dns_qtype               456     4.112390e+03
+[INFO] Feature importance saved to: reports/lightgbm_260805/reduction_1/feature_importance.csv
+[INFO] Model saved to: models/lightgbm_toniot_classification_reduction_1.pkl
+[INFO] Model size: 7102.82 KB (6.94 MB)

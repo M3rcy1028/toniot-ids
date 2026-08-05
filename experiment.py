@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 import time
 
 import matplotlib.pyplot as plt
@@ -12,8 +13,6 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.model_selection import train_test_split
-
 from lightgbm_model import create_lightgbm_model, train_model, save_model
 from toniot_dataset import ensure_processed_dataset
 from xai import XAIConfig, run_xai_analysis
@@ -21,8 +20,20 @@ from xai import XAIConfig, run_xai_analysis
 
 PROCESSED_DIR = Path("data_network/processed_type")
 MODEL_DIR = Path("models")
-REPORT_DIR = Path("reports/lightgbm")
+REPORT_DIR = Path("reports") / f"lightgbm_{datetime.now():%y%m%d}"
 XAI_DIR = REPORT_DIR / "xai"
+REDUCTION_1_DIR = REPORT_DIR / "reduction_1"
+REDUCTION_1_XAI_DIR = XAI_DIR / "reduction_1"
+REDUCTION_2_DIR = REPORT_DIR / "reduction_2"
+REDUCTION_2_XAI_DIR = XAI_DIR / "reduction_2"
+REDUCTION_3_DIR = REPORT_DIR / "reduction_3"
+REDUCTION_3_XAI_DIR = XAI_DIR / "reduction_3"
+REDUCTION_1_FEATURES = (
+    REDUCTION_1_XAI_DIR / "selection" / "final_selected_features.csv"
+)
+REDUCTION_2_FEATURES = (
+    REDUCTION_2_XAI_DIR / "selection" / "final_selected_features.csv"
+)
 
 RANDOM_STATE = 42
 
@@ -44,8 +55,10 @@ def load_processed_data(processed_dir: Path, feature_selection=False, fs_config=
     ensure_processed_dataset(processed_dir)
 
     X_train = pd.read_csv(processed_dir / "X_train.csv")
+    X_valid = pd.read_csv(processed_dir / "X_valid.csv")
     X_test = pd.read_csv(processed_dir / "X_test.csv")
     y_train = pd.read_csv(processed_dir / "y_train.csv").squeeze("columns")
+    y_valid = pd.read_csv(processed_dir / "y_valid.csv").squeeze("columns")
     y_test = pd.read_csv(processed_dir / "y_test.csv").squeeze("columns")
 
     if feature_selection:
@@ -53,13 +66,15 @@ def load_processed_data(processed_dir: Path, feature_selection=False, fs_config=
         selected_features = pd.read_csv(fs_config)["feature"].tolist()
 
         X_train = X_train[selected_features]
+        X_valid = X_valid[selected_features]
         X_test = X_test[selected_features]
 
     print("[INFO] Processed data loaded")
     print(f"[INFO] X_train: {X_train.shape}")
+    print(f"[INFO] X_valid: {X_valid.shape}")
     print(f"[INFO] X_test : {X_test.shape}")
     
-    return X_train, X_test, y_train, y_test
+    return X_train, X_valid, X_test, y_train, y_valid, y_test
 
 
 def evaluate_classwise_inference_time(model, X_test, y_test):
@@ -229,68 +244,599 @@ def save_confusion_matrix_plot(cm, class_names, report_dir: Path):
     print(f"[INFO] Confusion matrix plot saved to: {output_path}")
 
 
-def run_xai_feature_selection(X_train, y_train):
-    """Generate a leakage-safe feature list from a validation split.
+def run_xai_feature_selection(
+    X_train,
+    y_train,
+    X_valid,
+    y_valid,
+    output_dir=XAI_DIR,
+    config=None,
+):
+    """Generate a leakage-safe feature list with the validation split.
 
     The final test set is not used for feature selection. A separate LightGBM
-    model is fitted on X_fit and explained/evaluated on X_validation.
+    model is fitted on the training set and explained/evaluated on validation.
     """
-    X_fit, X_validation, y_fit, y_validation = train_test_split(
-        X_train,
-        y_train,
-        test_size=0.2,
-        random_state=RANDOM_STATE,
-        stratify=y_train,
-    )
-
     selection_model = create_lightgbm_model(
         num_classes=len(CLASS_NAMES),
         random_state=RANDOM_STATE,
     )
-    selection_model = train_model(selection_model, X_fit, y_fit)
-
-    config = XAIConfig(
-        random_state=RANDOM_STATE,
-        # Change these for each phase, e.g. 20 -> 10 -> 5.
-        top_k_shap=10,
-        top_k_cpf=10,
-        min_features_per_class=3,
-        cpf_metric="f1",
-        cpf_repeats=5,
-        cpf_n_conditioners=2,
-        cpf_n_bins=5,
-        shap_max_samples=3000,
-        interaction_max_samples=1000,
-        cpf_max_samples=None,
-        enable_interaction=True,
-        top_interaction_pairs_per_class=3,
-        interaction_add_orphan_pairs=False,
-        # LIME is optional and is excluded from automatic selection by default.
-        enable_lime=False,
-        include_lime_in_selection=False,
+    selection_model = train_model(
+        selection_model,
+        X_train,
+        y_train,
+        X_valid,
+        y_valid,
     )
+
+    if config is None:
+        config = XAIConfig(
+            random_state=RANDOM_STATE,
+            top_k_sage=14,
+            top_k_shap=12,
+            top_k_cpf=12,
+            min_features_per_class=3,
+            min_final_features=18,
+            max_final_features=20,
+            cpf_metric="f1",
+            cpf_repeats=5,
+            cpf_n_conditioners=2,
+            cpf_n_bins=5,
+            shap_batch_size=4096,
+            interaction_batch_size=256,
+            sage_repeats=1,
+            cpf_max_samples=None,
+            correlation_max_samples=None,
+            enable_interaction=True,
+            top_interaction_pairs_per_class=3,
+            interaction_add_orphan_pairs=False,
+            # LIME is optional and excluded from automatic selection by default.
+            enable_lime=False,
+            include_lime_in_selection=False,
+        )
 
     return run_xai_analysis(
         model=selection_model,
-        X_reference=X_fit,
-        y_reference=y_fit,
-        X_eval=X_validation,
-        y_eval=y_validation,
+        X_reference=X_train,
+        y_reference=y_train,
+        X_eval=X_valid,
+        y_eval=y_valid,
         class_names=CLASS_NAMES,
-        output_dir=XAI_DIR,
+        output_dir=output_dir,
         config=config,
     )
 
 
-def run_lightgbm_pipeline(save_results=True, feature_selection=False, fs_config=None, run_xai=True):
-    X_train, X_test, y_train, y_test = load_processed_data(PROCESSED_DIR, feature_selection=feature_selection, fs_config=fs_config)
+def _selection_metrics(model, X, y):
+    y_pred = model.predict(X)
+    return {
+        "accuracy": accuracy_score(y, y_pred),
+        "precision_macro": precision_score(
+            y, y_pred, average="macro", zero_division=0
+        ),
+        "recall_macro": recall_score(
+            y, y_pred, average="macro", zero_division=0
+        ),
+        "f1_macro": f1_score(y, y_pred, average="macro", zero_division=0),
+        "mitm_recall": recall_score(
+            y == 4,
+            y_pred == 4,
+            zero_division=0,
+        ),
+    }
 
-    # Final baseline model: train on all training rows and evaluate once on test.
+
+def run_reduction_1_experiment():
+    """Run full-train XAI and evaluate the first 18-20 feature reduction."""
+    X_train, X_valid, X_test, y_train, y_valid, y_test = load_processed_data(
+        PROCESSED_DIR
+    )
+
+    baseline_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    baseline_model = train_model(
+        baseline_model,
+        X_train,
+        y_train,
+        X_valid,
+        y_valid,
+    )
+    baseline_validation = _selection_metrics(
+        baseline_model,
+        X_valid,
+        y_valid,
+    )
+
+    xai_result = run_xai_feature_selection(
+        X_train,
+        y_train,
+        X_valid,
+        y_valid,
+        output_dir=REDUCTION_1_XAI_DIR,
+    )
+    selected_features = xai_result.final_features
+    print(f"[INFO] Reduction-1 selected features ({len(selected_features)}):")
+    print(selected_features)
+
+    reduced_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    reduced_model = train_model(
+        reduced_model,
+        X_train[selected_features],
+        y_train,
+        X_valid[selected_features],
+        y_valid,
+    )
+    reduced_validation = _selection_metrics(
+        reduced_model,
+        X_valid[selected_features],
+        y_valid,
+    )
+
+    REDUCTION_1_DIR.mkdir(parents=True, exist_ok=True)
+    validation_comparison = pd.DataFrame(
+        [
+            {"model": "baseline_22", **baseline_validation},
+            {
+                "model": f"reduction_1_{len(selected_features)}",
+                **reduced_validation,
+            },
+        ]
+    )
+    validation_comparison.to_csv(
+        REDUCTION_1_DIR / "validation_comparison.csv",
+        index=False,
+    )
+    print("\n========== Validation Comparison ==========")
+    print(validation_comparison.to_string(index=False))
+
+    accuracy_drop = baseline_validation["accuracy"] - reduced_validation["accuracy"]
+    macro_f1_drop = baseline_validation["f1_macro"] - reduced_validation["f1_macro"]
+    mitm_recall_drop = (
+        baseline_validation["mitm_recall"] - reduced_validation["mitm_recall"]
+    )
+    accepted = (
+        18 <= len(selected_features) <= 20
+        and accuracy_drop <= 0.001
+        and macro_f1_drop <= 0.002
+        and mitm_recall_drop <= 0.01
+    )
+    decision = pd.DataFrame(
+        [
+            {
+                "accepted": accepted,
+                "selected_feature_count": len(selected_features),
+                "accuracy_drop": accuracy_drop,
+                "macro_f1_drop": macro_f1_drop,
+                "mitm_recall_drop": mitm_recall_drop,
+            }
+        ]
+    )
+    decision.to_csv(REDUCTION_1_DIR / "acceptance_decision.csv", index=False)
+    print("\n========== Reduction-1 Acceptance ==========")
+    print(decision.to_string(index=False))
+
+    if not accepted:
+        print("[WARN] Reduction-1 rejected; test data was not evaluated.")
+        return {
+            "accepted": False,
+            "selected_features": selected_features,
+            "validation_comparison": validation_comparison,
+        }
+
+    metrics, report, cm, y_pred, y_prob, classwise_time_df = evaluate_model(
+        reduced_model,
+        X_test[selected_features],
+        y_test,
+    )
+    save_confusion_matrix_plot(cm, CLASS_NAMES, REDUCTION_1_DIR)
+    classwise_time_df.to_csv(
+        REDUCTION_1_DIR / "classwise_inference_time.csv",
+        index=False,
+    )
+    save_reports(
+        metrics,
+        report,
+        cm,
+        y_test,
+        y_pred,
+        y_prob,
+        REDUCTION_1_DIR,
+    )
+    save_feature_importance(
+        reduced_model,
+        selected_features,
+        REDUCTION_1_DIR,
+    )
+    save_model(
+        reduced_model,
+        MODEL_DIR,
+        filename="lightgbm_toniot_classification_reduction_1.pkl",
+    )
+    return {
+        "accepted": True,
+        "selected_features": selected_features,
+        "validation_comparison": validation_comparison,
+        "test_metrics": metrics,
+    }
+
+
+def run_reduction_2_experiment():
+    """Run full-train XAI on reduction-1 features and target 16-17 features."""
+    X_train, X_valid, X_test, y_train, y_valid, y_test = load_processed_data(
+        PROCESSED_DIR
+    )
+    if not REDUCTION_1_FEATURES.exists():
+        raise FileNotFoundError(
+            f"Reduction-1 feature list not found: {REDUCTION_1_FEATURES}"
+        )
+    input_features = pd.read_csv(REDUCTION_1_FEATURES)["feature"].tolist()
+    if len(input_features) != 18 or len(set(input_features)) != 18:
+        raise ValueError(
+            "Reduction-2 requires the verified 18 unique reduction-1 features"
+        )
+
+    X_train_input = X_train[input_features]
+    X_valid_input = X_valid[input_features]
+    baseline_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    baseline_model = train_model(
+        baseline_model,
+        X_train_input,
+        y_train,
+        X_valid_input,
+        y_valid,
+    )
+    baseline_validation = _selection_metrics(
+        baseline_model,
+        X_valid_input,
+        y_valid,
+    )
+
+    reduction_2_config = XAIConfig(
+        random_state=RANDOM_STATE,
+        top_k_sage=12,
+        top_k_shap=10,
+        top_k_cpf=10,
+        min_features_per_class=3,
+        min_final_features=16,
+        max_final_features=17,
+        cpf_metric="f1",
+        cpf_repeats=5,
+        cpf_n_conditioners=2,
+        cpf_n_bins=5,
+        shap_batch_size=4096,
+        interaction_batch_size=256,
+        sage_repeats=1,
+        cpf_max_samples=None,
+        correlation_max_samples=None,
+        enable_interaction=True,
+        top_interaction_pairs_per_class=3,
+        interaction_add_orphan_pairs=False,
+        enable_lime=False,
+        include_lime_in_selection=False,
+    )
+    xai_result = run_xai_feature_selection(
+        X_train_input,
+        y_train,
+        X_valid_input,
+        y_valid,
+        output_dir=REDUCTION_2_XAI_DIR,
+        config=reduction_2_config,
+    )
+    selected_features = xai_result.final_features
+    print(f"[INFO] Reduction-2 selected features ({len(selected_features)}):")
+    print(selected_features)
+
+    reduced_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    reduced_model = train_model(
+        reduced_model,
+        X_train[selected_features],
+        y_train,
+        X_valid[selected_features],
+        y_valid,
+    )
+    reduced_validation = _selection_metrics(
+        reduced_model,
+        X_valid[selected_features],
+        y_valid,
+    )
+
+    REDUCTION_2_DIR.mkdir(parents=True, exist_ok=True)
+    validation_comparison = pd.DataFrame(
+        [
+            {"model": "reduction_1_18", **baseline_validation},
+            {
+                "model": f"reduction_2_{len(selected_features)}",
+                **reduced_validation,
+            },
+        ]
+    )
+    validation_comparison.to_csv(
+        REDUCTION_2_DIR / "validation_comparison.csv",
+        index=False,
+    )
+    print("\n========== Validation Comparison ==========")
+    print(validation_comparison.to_string(index=False))
+
+    accuracy_drop = baseline_validation["accuracy"] - reduced_validation["accuracy"]
+    macro_f1_drop = baseline_validation["f1_macro"] - reduced_validation["f1_macro"]
+    mitm_recall_drop = (
+        baseline_validation["mitm_recall"] - reduced_validation["mitm_recall"]
+    )
+    accepted = (
+        16 <= len(selected_features) <= 17
+        and accuracy_drop <= 0.001
+        and macro_f1_drop <= 0.002
+        and mitm_recall_drop <= 0.01
+    )
+    decision = pd.DataFrame(
+        [
+            {
+                "accepted": accepted,
+                "selected_feature_count": len(selected_features),
+                "accuracy_drop": accuracy_drop,
+                "macro_f1_drop": macro_f1_drop,
+                "mitm_recall_drop": mitm_recall_drop,
+            }
+        ]
+    )
+    decision.to_csv(REDUCTION_2_DIR / "acceptance_decision.csv", index=False)
+    print("\n========== Reduction-2 Acceptance ==========")
+    print(decision.to_string(index=False))
+
+    if not accepted:
+        print("[WARN] Reduction-2 rejected; test data was not evaluated.")
+        return {
+            "accepted": False,
+            "selected_features": selected_features,
+            "validation_comparison": validation_comparison,
+        }
+
+    metrics, report, cm, y_pred, y_prob, classwise_time_df = evaluate_model(
+        reduced_model,
+        X_test[selected_features],
+        y_test,
+    )
+    save_confusion_matrix_plot(cm, CLASS_NAMES, REDUCTION_2_DIR)
+    classwise_time_df.to_csv(
+        REDUCTION_2_DIR / "classwise_inference_time.csv",
+        index=False,
+    )
+    save_reports(
+        metrics,
+        report,
+        cm,
+        y_test,
+        y_pred,
+        y_prob,
+        REDUCTION_2_DIR,
+    )
+    save_feature_importance(
+        reduced_model,
+        selected_features,
+        REDUCTION_2_DIR,
+    )
+    save_model(
+        reduced_model,
+        MODEL_DIR,
+        filename="lightgbm_toniot_classification_reduction_2.pkl",
+    )
+    return {
+        "accepted": True,
+        "selected_features": selected_features,
+        "validation_comparison": validation_comparison,
+        "test_metrics": metrics,
+    }
+
+
+def run_reduction_3_experiment():
+    """Run full-train XAI on reduction-2 features and target 14-15 features."""
+    X_train, X_valid, X_test, y_train, y_valid, y_test = load_processed_data(
+        PROCESSED_DIR
+    )
+    if not REDUCTION_2_FEATURES.exists():
+        raise FileNotFoundError(
+            f"Reduction-2 feature list not found: {REDUCTION_2_FEATURES}"
+        )
+    reduction_2_decision_path = REDUCTION_2_DIR / "acceptance_decision.csv"
+    if not reduction_2_decision_path.exists():
+        raise FileNotFoundError(
+            f"Reduction-2 acceptance decision not found: {reduction_2_decision_path}"
+        )
+    reduction_2_decision = pd.read_csv(reduction_2_decision_path)
+    if reduction_2_decision.empty or not bool(
+        reduction_2_decision.loc[0, "accepted"]
+    ):
+        raise ValueError("Reduction-3 requires an accepted reduction-2 result")
+
+    input_features = pd.read_csv(REDUCTION_2_FEATURES)["feature"].tolist()
+    if len(input_features) != 16 or len(set(input_features)) != 16:
+        raise ValueError(
+            "Reduction-3 requires the verified 16 unique reduction-2 features"
+        )
+
+    X_train_input = X_train[input_features]
+    X_valid_input = X_valid[input_features]
+    baseline_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    baseline_model = train_model(
+        baseline_model,
+        X_train_input,
+        y_train,
+        X_valid_input,
+        y_valid,
+    )
+    baseline_validation = _selection_metrics(
+        baseline_model,
+        X_valid_input,
+        y_valid,
+    )
+
+    reduction_3_config = XAIConfig(
+        random_state=RANDOM_STATE,
+        top_k_sage=10,
+        top_k_shap=8,
+        top_k_cpf=8,
+        min_features_per_class=3,
+        min_final_features=14,
+        max_final_features=15,
+        cpf_metric="f1",
+        cpf_repeats=5,
+        cpf_n_conditioners=2,
+        cpf_n_bins=5,
+        shap_batch_size=4096,
+        interaction_batch_size=256,
+        sage_repeats=1,
+        cpf_max_samples=None,
+        correlation_max_samples=None,
+        enable_interaction=True,
+        top_interaction_pairs_per_class=3,
+        interaction_add_orphan_pairs=False,
+        enable_lime=False,
+        include_lime_in_selection=False,
+    )
+    xai_result = run_xai_feature_selection(
+        X_train_input,
+        y_train,
+        X_valid_input,
+        y_valid,
+        output_dir=REDUCTION_3_XAI_DIR,
+        config=reduction_3_config,
+    )
+    selected_features = xai_result.final_features
+    print(f"[INFO] Reduction-3 selected features ({len(selected_features)}):")
+    print(selected_features)
+
+    reduced_model = create_lightgbm_model(
+        num_classes=len(CLASS_NAMES),
+        random_state=RANDOM_STATE,
+    )
+    reduced_model = train_model(
+        reduced_model,
+        X_train[selected_features],
+        y_train,
+        X_valid[selected_features],
+        y_valid,
+    )
+    reduced_validation = _selection_metrics(
+        reduced_model,
+        X_valid[selected_features],
+        y_valid,
+    )
+
+    REDUCTION_3_DIR.mkdir(parents=True, exist_ok=True)
+    validation_comparison = pd.DataFrame(
+        [
+            {"model": "reduction_2_16", **baseline_validation},
+            {
+                "model": f"reduction_3_{len(selected_features)}",
+                **reduced_validation,
+            },
+        ]
+    )
+    validation_comparison.to_csv(
+        REDUCTION_3_DIR / "validation_comparison.csv",
+        index=False,
+    )
+    print("\n========== Validation Comparison ==========")
+    print(validation_comparison.to_string(index=False))
+
+    accuracy_drop = baseline_validation["accuracy"] - reduced_validation["accuracy"]
+    macro_f1_drop = baseline_validation["f1_macro"] - reduced_validation["f1_macro"]
+    mitm_recall_drop = (
+        baseline_validation["mitm_recall"] - reduced_validation["mitm_recall"]
+    )
+    accepted = (
+        14 <= len(selected_features) <= 15
+        and accuracy_drop <= 0.001
+        and macro_f1_drop <= 0.002
+        and mitm_recall_drop <= 0.01
+    )
+    decision = pd.DataFrame(
+        [
+            {
+                "accepted": accepted,
+                "selected_feature_count": len(selected_features),
+                "accuracy_drop": accuracy_drop,
+                "macro_f1_drop": macro_f1_drop,
+                "mitm_recall_drop": mitm_recall_drop,
+            }
+        ]
+    )
+    decision.to_csv(REDUCTION_3_DIR / "acceptance_decision.csv", index=False)
+    print("\n========== Reduction-3 Acceptance ==========")
+    print(decision.to_string(index=False))
+
+    if not accepted:
+        print("[WARN] Reduction-3 rejected; test data was not evaluated.")
+        return {
+            "accepted": False,
+            "selected_features": selected_features,
+            "validation_comparison": validation_comparison,
+        }
+
+    metrics, report, cm, y_pred, y_prob, classwise_time_df = evaluate_model(
+        reduced_model,
+        X_test[selected_features],
+        y_test,
+    )
+    save_confusion_matrix_plot(cm, CLASS_NAMES, REDUCTION_3_DIR)
+    classwise_time_df.to_csv(
+        REDUCTION_3_DIR / "classwise_inference_time.csv",
+        index=False,
+    )
+    save_reports(
+        metrics,
+        report,
+        cm,
+        y_test,
+        y_pred,
+        y_prob,
+        REDUCTION_3_DIR,
+    )
+    save_feature_importance(
+        reduced_model,
+        selected_features,
+        REDUCTION_3_DIR,
+    )
+    save_model(
+        reduced_model,
+        MODEL_DIR,
+        filename="lightgbm_toniot_classification_reduction_3.pkl",
+    )
+    return {
+        "accepted": True,
+        "selected_features": selected_features,
+        "validation_comparison": validation_comparison,
+        "test_metrics": metrics,
+    }
+
+
+def run_lightgbm_pipeline(save_results=True, feature_selection=False, fs_config=None, run_xai=True):
+    X_train, X_valid, X_test, y_train, y_valid, y_test = load_processed_data(
+        PROCESSED_DIR,
+        feature_selection=feature_selection,
+        fs_config=fs_config,
+    )
+
+    # Tune the number of boosting rounds on validation, then evaluate test once.
     model = create_lightgbm_model(
         num_classes=len(CLASS_NAMES),
         random_state=RANDOM_STATE,
     )
-    model = train_model(model, X_train, y_train)
+    model = train_model(model, X_train, y_train, X_valid, y_valid)
 
     metrics, report, cm, y_pred, y_prob, classwise_time_df = evaluate_model(
         model,
@@ -318,7 +864,12 @@ def run_lightgbm_pipeline(save_results=True, feature_selection=False, fs_config=
         save_model(model, MODEL_DIR)
 
         if run_xai:
-            xai_result = run_xai_feature_selection(X_train, y_train)
+            xai_result = run_xai_feature_selection(
+                X_train,
+                y_train,
+                X_valid,
+                y_valid,
+            )
             print("\n[INFO] Features for the next reduction phase:")
             print(xai_result.final_features)
     else:

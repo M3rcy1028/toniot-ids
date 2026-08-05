@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1920" viewBox="0 0 1920 1920" role="img" aria-labelledby="title desc">
+  <title id="title">TON_IoT LightGBM 학습 및 XAI 피처 축소 전체 파이프라인</title>
+  <desc id="desc">원본 데이터 전처리부터 train validation test 분할, LightGBM 학습, 전체 train 기반 SAGE SHAP CPF 분석, 세 단계 피처 축소와 validation 채택 여부까지의 흐름</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071426"/>
+      <stop offset="1" stop-color="#10243e"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#115e59"/>
+    </linearGradient>
+    <linearGradient id="modelGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="xaiGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="acceptGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16a34a"/>
+      <stop offset="1" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="warnGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d97706"/>
+      <stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#4ade80"/>
+    </marker>
+    <style>
+      .title { font: 700 38px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #f8fafc; }
+      .subtitle { font: 400 18px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #94a3b8; }
+      .section { font: 700 22px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #e2e8f0; letter-spacing: 0.5px; }
+      .box-title { font: 700 19px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #ffffff; }
+      .box-text { font: 400 15px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #e2e8f0; }
+      .small { font: 400 13px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #cbd5e1; }
+      .metric { font: 700 15px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #dcfce7; }
+      .chip { font: 700 13px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #ffffff; }
+      .box { stroke: #ffffff; stroke-opacity: 0.16; stroke-width: 1.5; filter: url(#shadow); }
+      .neutral { fill: #1e293b; }
+      .data { fill: url(#dataGrad); }
+      .model { fill: url(#modelGrad); }
+      .xai { fill: url(#xaiGrad); }
+      .accept { fill: url(#acceptGrad); }
+      .warn { fill: url(#warnGrad); }
+      .arrow { fill: none; stroke: #94a3b8; stroke-width: 3; marker-end: url(#arrow); }
+      .arrow-green { fill: none; stroke: #4ade80; stroke-width: 3.5; marker-end: url(#arrowGreen); }
+      .dashed { fill: none; stroke: #94a3b8; stroke-width: 2.5; stroke-dasharray: 8 7; marker-end: url(#arrow); }
+      .divider { stroke: #334155; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1920" fill="url(#background)"/>
+  <circle cx="1750" cy="110" r="230" fill="#2563eb" opacity="0.08"/>
+  <circle cx="160" cy="1500" r="270" fill="#7c3aed" opacity="0.07"/>
+
+  <text x="70" y="72" class="title">TON_IoT LightGBM 학습 · XAI 피처 축소 전체 파이프라인</text>
+  <text x="72" y="107" class="subtitle">전체 train 기반 Macro-SAGE + Class-wise SHAP/CPF · Validation gate · 단계적 22 → 18 → 16 → 14 candidate</text>
+
+  <!-- Legend -->
+  <g transform="translate(1370,54)">
+    <rect x="0" y="0" width="22" height="14" rx="4" fill="#0f766e"/><text x="30" y="13" class="small">데이터</text>
+    <rect x="112" y="0" width="22" height="14" rx="4" fill="#2563eb"/><text x="142" y="13" class="small">모델</text>
+    <rect x="224" y="0" width="22" height="14" rx="4" fill="#7c3aed"/><text x="254" y="13" class="small">XAI</text>
+    <rect x="324" y="0" width="22" height="14" rx="4" fill="#16a34a"/><text x="354" y="13" class="small">채택</text>
+  </g>
+
+  <!-- Section 1 -->
+  <text x="70" y="158" class="section">1. 데이터 준비</text>
+  <line x1="70" y1="174" x2="1850" y2="174" class="divider"/>
+
+  <g transform="translate(70,205)">
+    <rect width="290" height="170" rx="18" class="box data"/>
+    <text x="24" y="38" class="box-title">원본 네트워크 데이터</text>
+    <text x="24" y="72" class="box-text">data_network/raw/</text>
+    <text x="24" y="96" class="box-text">train_test_network.csv</text>
+    <rect x="22" y="118" width="126" height="30" rx="15" fill="#0b4f4a"/>
+    <text x="38" y="138" class="chip">211,043 rows</text>
+    <rect x="158" y="118" width="108" height="30" rx="15" fill="#0b4f4a"/>
+    <text x="179" y="138" class="chip">44 columns</text>
+  </g>
+
+  <path d="M 360 290 L 405 290" class="arrow"/>
+
+  <g transform="translate(405,205)">
+    <rect width="400" height="170" rx="18" class="box data"/>
+    <text x="24" y="36" class="box-title">toniot_dataset.py 전처리</text>
+    <text x="24" y="68" class="box-text">• IP/port/label 5개 제거</text>
+    <text x="24" y="92" class="box-text">• '-' 비율 95% 이상 16개 제거</text>
+    <text x="24" y="116" class="box-text">• 범주형 LabelEncoder</text>
+    <text x="24" y="140" class="box-text">• train에만 encoder/scaler fit</text>
+  </g>
+
+  <path d="M 805 290 L 850 290" class="arrow"/>
+
+  <g transform="translate(850,205)">
+    <rect width="450" height="170" rx="18" class="box data"/>
+    <text x="24" y="36" class="box-title">Stratified 70 / 15 / 15 분할</text>
+    <rect x="24" y="62" width="118" height="75" rx="12" fill="#0b4f4a"/>
+    <text x="47" y="88" class="chip">TRAIN</text><text x="39" y="115" class="box-text">147,729</text>
+    <rect x="165" y="62" width="118" height="75" rx="12" fill="#0b4f4a"/>
+    <text x="187" y="88" class="chip">VALID</text><text x="184" y="115" class="box-text">31,657</text>
+    <rect x="306" y="62" width="118" height="75" rx="12" fill="#0b4f4a"/>
+    <text x="331" y="88" class="chip">TEST</text><text x="325" y="115" class="box-text">31,657</text>
+  </g>
+
+  <path d="M 1300 290 L 1345 290" class="arrow"/>
+
+  <g transform="translate(1345,205)">
+    <rect width="505" height="170" rx="18" class="box neutral"/>
+    <text x="24" y="36" class="box-title">processed_type 산출물 · 22 features</text>
+    <text x="24" y="68" class="box-text">X_train.csv · y_train.csv</text>
+    <text x="24" y="92" class="box-text">X_valid.csv · y_valid.csv</text>
+    <text x="24" y="116" class="box-text">X_test.csv · y_test.csv</text>
+    <text x="24" y="140" class="small">encoders · scaler · target_encoder 함께 저장</text>
+  </g>
+
+  <!-- Section 2 -->
+  <text x="70" y="435" class="section">2. Baseline LightGBM 학습과 평가</text>
+  <line x1="70" y1="451" x2="1850" y2="451" class="divider"/>
+
+  <path d="M 1080 375 C 1080 420, 335 405, 335 490" class="arrow"/>
+  <g transform="translate(70,490)">
+    <rect width="530" height="185" rx="18" class="box model"/>
+    <text x="24" y="36" class="box-title">LightGBM multiclass 학습 · 22 features</text>
+    <text x="24" y="68" class="box-text">objective=multiclass · class_weight=None</text>
+    <text x="24" y="93" class="box-text">learning_rate=0.05 · max 3,000 rounds</text>
+    <text x="24" y="118" class="box-text">num_leaves=31 · max_depth=15 · CPU 8 threads</text>
+    <text x="24" y="151" class="small">train으로 fit</text>
+  </g>
+
+  <path d="M 600 582 L 655 582" class="arrow"/>
+  <g transform="translate(655,490)">
+    <rect width="430" height="185" rx="18" class="box model"/>
+    <text x="24" y="36" class="box-title">Validation Early Stopping</text>
+    <text x="24" y="69" class="box-text">metric = multi_logloss</text>
+    <text x="24" y="94" class="box-text">50 rounds 동안 개선 없으면 종료</text>
+    <rect x="24" y="122" width="170" height="34" rx="17" fill="#153e9f"/>
+    <text x="43" y="144" class="chip">Baseline best = 227</text>
+  </g>
+
+  <path d="M 1085 582 L 1140 582" class="arrow"/>
+  <g transform="translate(1140,490)">
+    <rect width="350" height="185" rx="18" class="box neutral"/>
+    <text x="24" y="36" class="box-title">Baseline Test 평가</text>
+    <text x="24" y="70" class="box-text">Accuracy · Macro P/R/F1</text>
+    <text x="24" y="96" class="box-text">Class report · Confusion matrix</text>
+    <text x="24" y="122" class="box-text">Inference latency · Throughput</text>
+    <text x="24" y="153" class="metric">Accuracy 97.7920%</text>
+  </g>
+
+  <path d="M 1490 582 L 1545 582" class="arrow"/>
+  <g transform="translate(1545,490)">
+    <rect width="305" height="185" rx="18" class="box neutral"/>
+    <text x="22" y="36" class="box-title">Baseline 저장</text>
+    <text x="22" y="70" class="box-text">reports/lightgbm_260805/</text>
+    <text x="22" y="98" class="box-text">models/*.pkl</text>
+    <text x="22" y="128" class="small">test는 모델 설정 확정 후</text>
+    <text x="22" y="148" class="small">최종 평가에 사용</text>
+  </g>
+
+  <!-- Section 3 -->
+  <text x="70" y="742" class="section">3. Full-train XAI 중요도 산출</text>
+  <line x1="70" y1="758" x2="1850" y2="758" class="divider"/>
+  <path d="M 335 675 C 335 720, 310 720, 310 795" class="arrow"/>
+
+  <g transform="translate(70,795)">
+    <rect width="455" height="205" rx="18" class="box xai"/>
+    <text x="24" y="36" class="box-title">① Class-balanced Macro-SAGE · 주 기준</text>
+    <text x="24" y="68" class="box-text">train 전체 147,729행 × 전체 피처</text>
+    <text x="24" y="94" class="box-text">random train donor로 marginalization</text>
+    <text x="24" y="120" class="box-text">one-vs-rest BCE · positive/negative 50:50</text>
+    <text x="24" y="146" class="box-text">10개 클래스 동일 비중 평균</text>
+    <rect x="24" y="164" width="165" height="26" rx="13" fill="#5120a8"/>
+    <text x="42" y="182" class="chip">모든 행 정확히 사용</text>
+  </g>
+
+  <g transform="translate(555,795)">
+    <rect width="360" height="205" rx="18" class="box xai"/>
+    <text x="24" y="36" class="box-title">② Class-wise SHAP</text>
+    <text x="24" y="68" class="box-text">train 전체를 batch 처리</text>
+    <text x="24" y="94" class="box-text">true class 행 × class output</text>
+    <text x="24" y="120" class="box-text">mean |SHAP| 및 클래스별 rank</text>
+    <text x="24" y="154" class="small">기존 validation 3,000 sample</text>
+    <text x="24" y="176" class="small">방식에서 full-train으로 개선</text>
+  </g>
+
+  <g transform="translate(945,795)">
+    <rect width="390" height="205" rx="18" class="box xai"/>
+    <text x="24" y="36" class="box-title">③ Class-wise CPF · 보조 기준</text>
+    <text x="24" y="68" class="box-text">train 전체 · 클래스별 F1 감소량</text>
+    <text x="24" y="94" class="box-text">상관 피처 quantile group 내부 shuffle</text>
+    <text x="24" y="120" class="box-text">각 피처 5회 conditional permutation</text>
+    <text x="24" y="154" class="small">정확한 p(Xⱼ|X₋ⱼ)가 아닌</text>
+    <text x="24" y="176" class="small">실용적 조건부 permutation 근사</text>
+  </g>
+
+  <g transform="translate(1365,795)">
+    <rect width="485" height="205" rx="18" class="box warn"/>
+    <text x="24" y="36" class="box-title">④ SHAP Interaction · 파트너 보호</text>
+    <text x="24" y="68" class="box-text">선택 피처의 강한 상대 피처만 보호</text>
+    <text x="24" y="94" class="box-text">유효한 class-wise tensor일 때만 적용</text>
+    <text x="24" y="127" class="box-text">현재: 10-class에 단일 tensor 반환</text>
+    <rect x="24" y="148" width="248" height="32" rx="16" fill="#78350f"/>
+    <text x="43" y="170" class="chip">잘못된 복제 없이 안전하게 생략</text>
+    <text x="300" y="168" class="small">LIME: 선택 제외</text>
+  </g>
+
+  <!-- Section 4 -->
+  <text x="70" y="1062" class="section">4. 단계적 피처 선택 · 재학습 · Validation Gate</text>
+  <line x1="70" y1="1078" x2="1850" y2="1078" class="divider"/>
+  <path d="M 300 1000 C 300 1040, 300 1040, 300 1115" class="arrow"/>
+  <path d="M 735 1000 C 735 1040, 580 1040, 580 1115" class="arrow"/>
+  <path d="M 1140 1000 C 1140 1040, 850 1040, 850 1115" class="arrow"/>
+
+  <g transform="translate(70,1115)">
+    <rect width="500" height="210" rx="18" class="box xai"/>
+    <text x="24" y="36" class="box-title">Reduction-1 · 22 → 18</text>
+    <text x="24" y="68" class="box-text">Macro-SAGE top14 core</text>
+    <text x="24" y="94" class="box-text">SHAP top12 ∩ positive CPF top12</text>
+    <text x="24" y="120" class="box-text">클래스별 최소 3개 보호 · SAGE floor 18</text>
+    <text x="24" y="150" class="small">제거: missed_bytes · HTTP body/status 3개</text>
+    <rect x="24" y="168" width="198" height="28" rx="14" fill="#5120a8"/>
+    <text x="43" y="187" class="chip">선택 결과: 18 features</text>
+  </g>
+
+  <path d="M 570 1220 L 635 1220" class="arrow"/>
+  <g transform="translate(635,1115)">
+    <rect width="390" height="210" rx="18" class="box model"/>
+    <text x="24" y="36" class="box-title">18-feature 재학습</text>
+    <text x="24" y="68" class="box-text">동일 LightGBM · 동일 split</text>
+    <text x="24" y="94" class="box-text">Validation early stopping</text>
+    <text x="24" y="120" class="box-text">Best iteration = 203</text>
+    <text x="24" y="152" class="small">XAI 이외 조건 고정</text>
+  </g>
+
+  <path d="M 1025 1220 L 1090 1220" class="arrow-green"/>
+  <g transform="translate(1090,1115)">
+    <polygon points="175,0 350,105 175,210 0,105" class="box accept"/>
+    <text x="96" y="72" class="box-title">Validation Gate</text>
+    <text x="68" y="103" class="box-text">Accuracy ↓ ≤ 0.1%p</text>
+    <text x="65" y="128" class="box-text">Macro F1 ↓ ≤ 0.2%p</text>
+    <text x="58" y="153" class="box-text">MITM recall ↓ ≤ 1%p</text>
+  </g>
+
+  <path d="M 1440 1220 L 1495 1220" class="arrow-green"/>
+  <g transform="translate(1495,1115)">
+    <rect width="355" height="210" rx="18" class="box accept"/>
+    <text x="24" y="36" class="box-title">Reduction-1 채택 · Test</text>
+    <text x="24" y="72" class="metric">Accuracy 97.8172%</text>
+    <text x="24" y="99" class="metric">Macro F1 95.5692%</text>
+    <text x="24" y="126" class="metric">MITM F1 76.97%</text>
+    <text x="24" y="158" class="box-text">모델 6.94 MB · best 203</text>
+    <text x="24" y="184" class="small">종합 추천 모델</text>
+  </g>
+
+  <!-- Reduction 2 row -->
+  <path d="M 1670 1325 C 1670 1360, 320 1350, 320 1395" class="dashed"/>
+  <g transform="translate(70,1395)">
+    <rect width="500" height="170" rx="18" class="box xai"/>
+    <text x="24" y="35" class="box-title">Reduction-2 · 18 → 16</text>
+    <text x="24" y="66" class="box-text">Macro-SAGE top12 · SHAP/CPF top10</text>
+    <text x="24" y="92" class="box-text">SAGE floor 16 · interaction max17</text>
+    <text x="24" y="119" class="small">추가 제거: dns_qclass · dns_qtype</text>
+    <rect x="24" y="132" width="198" height="27" rx="14" fill="#5120a8"/>
+    <text x="43" y="151" class="chip">선택 결과: 16 features</text>
+  </g>
+
+  <path d="M 570 1480 L 625 1480" class="arrow"/>
+  <g transform="translate(625,1395)">
+    <rect width="380" height="170" rx="18" class="box model"/>
+    <text x="24" y="35" class="box-title">16-feature 재학습</text>
+    <text x="24" y="68" class="box-text">Validation 지표 모두 개선</text>
+    <text x="24" y="94" class="box-text">Best iteration = 219</text>
+    <text x="24" y="126" class="small">Gate 통과 후 test 평가</text>
+  </g>
+
+  <path d="M 1005 1480 L 1060 1480" class="arrow-green"/>
+  <g transform="translate(1060,1395)">
+    <rect width="395" height="170" rx="18" class="box accept"/>
+    <text x="24" y="35" class="box-title">Reduction-2 채택 · Test</text>
+    <text x="24" y="68" class="metric">Accuracy 97.8204% · MITM recall 78.34%</text>
+    <text x="24" y="95" class="box-text">MITM F1 76.64% · Macro F1 95.5419%</text>
+    <text x="24" y="123" class="box-text">모델 7.49 MB · 추론은 R1보다 느림</text>
+    <text x="24" y="148" class="small">최소 피처 / recall 우선 대안</text>
+  </g>
+
+  <path d="M 1455 1480 L 1500 1480" class="arrow"/>
+  <g transform="translate(1500,1395)">
+    <rect width="350" height="170" rx="18" class="box neutral"/>
+    <text x="22" y="34" class="box-title">모든 단계 별도 보존</text>
+    <text x="22" y="64" class="box-text">reports/.../reduction_1, 2, 3</text>
+    <text x="22" y="89" class="box-text">reports/.../xai/reduction_1, 2, 3</text>
+    <text x="22" y="114" class="box-text">models/*_reduction_1, 2.pkl</text>
+    <text x="22" y="141" class="small">실행 로그 · ExpSheet_YYMMDD.md</text>
+  </g>
+
+  <!-- Reduction 3 row -->
+  <path d="M 1670 1565 C 1670 1590, 320 1580, 320 1605" class="dashed"/>
+  <g transform="translate(70,1605)">
+    <rect width="500" height="190" rx="18" class="box xai"/>
+    <text x="24" y="35" class="box-title">Reduction-3 · 16 → 14 candidate</text>
+    <text x="24" y="66" class="box-text">Macro-SAGE top10 · SHAP/CPF top8</text>
+    <text x="24" y="92" class="box-text">클래스별 최소 3개 보호 · SAGE floor 14</text>
+    <text x="24" y="121" class="small">추가 제거: dns_rcode · dns_RD</text>
+    <rect x="24" y="142" width="198" height="28" rx="14" fill="#5120a8"/>
+    <text x="43" y="161" class="chip">선택 결과: 14 features</text>
+  </g>
+
+  <path d="M 570 1700 L 625 1700" class="arrow"/>
+  <g transform="translate(625,1605)">
+    <rect width="380" height="190" rx="18" class="box model"/>
+    <text x="24" y="35" class="box-title">14-feature 재학습</text>
+    <text x="24" y="68" class="box-text">Validation early stopping</text>
+    <text x="24" y="94" class="box-text">Best iteration = 203</text>
+    <text x="24" y="127" class="small">Accuracy/Macro F1 기준 통과</text>
+    <text x="24" y="153" class="small">MITM recall 기준 초과</text>
+  </g>
+
+  <path d="M 1005 1700 L 1060 1700" class="arrow"/>
+  <g transform="translate(1060,1605)">
+    <rect width="395" height="190" rx="18" class="box warn"/>
+    <text x="24" y="35" class="box-title">Reduction-3 기각 · Test 생략</text>
+    <text x="24" y="68" class="metric">Valid accuracy 98.0320 → 97.9941%</text>
+    <text x="24" y="95" class="box-text">Macro F1 ↓ 0.1767%p (통과)</text>
+    <text x="24" y="122" class="box-text">MITM recall ↓ 1.2739%p (실패)</text>
+    <text x="24" y="153" class="small">허용 기준: MITM recall ↓ ≤ 1%p</text>
+  </g>
+
+  <path d="M 1455 1700 L 1500 1700" class="arrow"/>
+  <g transform="translate(1500,1605)">
+    <rect width="350" height="190" rx="18" class="box neutral"/>
+    <text x="22" y="34" class="box-title">현재 결론</text>
+    <text x="22" y="65" class="box-text">마지막 채택 단계: R2 16개</text>
+    <text x="22" y="91" class="box-text">R3 test/model 저장 안 함</text>
+    <text x="22" y="117" class="box-text">R3 XAI/validation/log 보존</text>
+    <text x="22" y="151" class="small">종합 추천 R1 · 최소 피처 대안 R2</text>
+  </g>
+
+  <!-- Footer -->
+  <rect x="70" y="1840" width="1780" height="50" rx="14" fill="#0f172a" stroke="#334155"/>
+  <text x="92" y="1871" class="small">주의: 단계적 실험에서 validation을 반복 사용했으므로 최종 배포 비교에는 별도 untouched holdout 또는 group-aware split 권장</text>
+  <text x="1818" y="1871" text-anchor="end" class="small">2026-08-05</text>
+</svg>
