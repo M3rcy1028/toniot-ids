@@ -13,9 +13,9 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from lightgbm_model import create_lightgbm_model, train_model, save_model
-from toniot_dataset import ensure_processed_dataset
-from xai import XAIConfig, run_xai_analysis
+from .model import create_lightgbm_model, train_model, save_model
+from .data import ensure_processed_dataset
+from .xai import XAIConfig, run_xai_analysis
 
 
 PROCESSED_DIR = Path("data_network/processed_type")
@@ -874,7 +874,3 @@ def run_lightgbm_pipeline(save_results=True, feature_selection=False, fs_config=
             print(xai_result.final_features)
     else:
         print("Terminate experiment without saving results")
-
-
-if __name__ == "__main__":
-    run_lightgbm_pipeline(save_results=True, run_xai=True)

@@ -161,7 +161,7 @@ The model correctly classifies **30,966 / 31,657** records. MITM has 157 test ex
 ### 1. Download and install dependencies
 
 ```bash
-git clone --branch xai --single-branch --depth 1 https://github.com/M3rcy1028/toniot-ids.git
+git clone https://github.com/M3rcy1028/toniot-ids.git
 cd toniot-ids
 ```
 
@@ -170,7 +170,7 @@ Windows PowerShell:
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-toniot.txt
+python -m pip install -e .
 ```
 
 Linux/macOS, with Python 3.14 installed:
@@ -178,10 +178,12 @@ Linux/macOS, with Python 3.14 installed:
 ```bash
 python3.14 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements-toniot.txt
+python -m pip install -e .
 ```
 
 Model loading and inference use **CPython 3.14.4**. Dependencies are pinned in `requirements-toniot.txt`.
+
+`python -m toniot_ids --help` lists all commands. Installation also provides the equivalent `toniot-ids` command.
 
 | Package | Version | Package | Version |
 | --- | --- | --- | --- |
@@ -220,23 +222,23 @@ Run training in a separate clone. Models are written to `models/`, and experimen
 
 ```bash
 # Baseline training and evaluation without the XAI pass
-python -c "from experiment import run_lightgbm_pipeline; run_lightgbm_pipeline(save_results=True, feature_selection=False, run_xai=False)"
+python -m toniot_ids baseline --no-xai
 
-# Run reductions in order using the preceding stage's outputs
-python run_reduction_1.py
-python run_reduction_2.py
-python run_reduction_3.py
+# Run all reduction stages in order
+python -m toniot_ids reduce all
 ```
 
-Each process uses its startup date to locate experiment outputs, so run dependent stages in order on the same date. The results in this README are in `reports/lightgbm_260805/`.
+`reduce all` runs the stages in one process and stops when a candidate fails validation. Use `reduce 1`, `reduce 2`, or `reduce 3` for an individual stage. Independent invocations use date-based report directories. The results in this README are in `reports/lightgbm_260805/`.
+
+Use `python -m toniot_ids --workspace /path/to/experiment baseline --no-xai` to read `data_network/` and write `models/` and `reports/` in another directory.
 
 The pipeline reuses saved processed CSVs when they exist. To explicitly rebuild them from the network CSV:
 
 ```bash
-python -c "from toniot_dataset import ensure_raw_dataset, preprocess_dataset; ensure_raw_dataset(); preprocess_dataset()"
+python -m toniot_ids preprocess
 ```
 
-If the raw CSV is absent, `ensure_raw_dataset()` downloads it from the Kaggle mirror. Configure Kaggle credentials locally. `python run.py` runs baseline training and XAI by default; use the `run_xai=False` call above for baseline-only training.
+If the raw CSV is absent, preprocessing downloads it from the Kaggle mirror. Configure Kaggle credentials locally. `baseline` includes XAI by default; `--no-xai` selects baseline-only training. `baseline --features path/to/features.csv` selects inputs from a CSV with a `feature` column. `python -m toniot_ids analyze` generates descriptive statistics.
 
 ### 4. Verify results and generate figures
 
@@ -248,17 +250,20 @@ This checks all three prediction files against their confusion matrices and macr
 
 ## Model configuration and repository map
 
-The classifier uses multiclass GBDT, up to 3,000 boosting rounds, learning rate `0.05`, `num_leaves=31`, `max_depth=15`, `colsample_bytree=0.8`, random seed `42`, and `8` CPU threads. Validation `multi_logloss` controls early stopping with patience `50`. Row-bagging settings are `subsample=0.8` and `subsample_freq=0`. Full configuration: [`lightgbm_model.py`](lightgbm_model.py)
+The classifier uses multiclass GBDT, up to 3,000 boosting rounds, learning rate `0.05`, `num_leaves=31`, `max_depth=15`, `colsample_bytree=0.8`, random seed `42`, and `8` CPU threads. Validation `multi_logloss` controls early stopping with patience `50`. Row-bagging settings are `subsample=0.8` and `subsample_freq=0`. Full configuration: [`toniot_ids/model.py`](toniot_ids/model.py)
 
 ```text
 toniot-ids/
-├── toniot_dataset.py        # Download, split, encoding, scaling
-├── lightgbm_model.py        # LightGBM construction, fitting, persistence
-├── experiment.py           # Baseline, reductions, acceptance gates, evaluation
-├── xai.py                   # Class-wise importance, interactions, consensus selection
-├── run.py                   # Baseline + optional feature-selected entry point
-├── run_reduction_{1,2,3}.py  # Sequential reduction experiments
-├── requirements-toniot.txt  # Pinned experiment dependencies
+├── pyproject.toml          # Package metadata and CLI installation
+├── requirements-toniot.txt # Pinned experiment dependencies
+├── toniot_ids/
+│   ├── cli.py              # preprocess / analyze / baseline / reduce
+│   ├── data.py             # Download, split, encoding, scaling
+│   ├── model.py            # LightGBM construction, fitting, persistence
+│   ├── experiments.py      # Baseline, reductions, acceptance gates, evaluation
+│   └── xai.py              # Feature importance and consensus selection
+├── experiments/telemetry/  # Independent sensor-data preprocessing
+├── tests/                  # CLI workflow integration checks
 ├── data_network/           # Network CSV and processed data
 ├── data_iot/               # IoT telemetry experiment data
 ├── models/                 # Trained models
@@ -271,6 +276,8 @@ toniot-ids/
 ```
 
 Network experiments read `data_network/processed_type`. See [experiment logs and notes](docs/experiments/README.md) and the [detailed pipeline figure](docs/figures/README.md).
+
+Run the integration checks with `python -m unittest discover -s tests -v`. They preprocess a small fixture, train a real LightGBM model, and verify its serialized predictions inside a temporary workspace.
 
 ## References and related implementation
 

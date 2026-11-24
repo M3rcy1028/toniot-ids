@@ -30,4 +30,4 @@ Dependencies are installed separately and retain their upstream licenses and cop
 | LIME | [marcotcr/lime](https://github.com/marcotcr/lime) |
 | kagglehub | [Kaggle/kagglehub](https://github.com/Kaggle/kagglehub) |
 
-The class-wise aggregation, grouped-shuffle CPFI, and consensus selection procedure are implemented in this repository's `xai.py`.
+The class-wise aggregation, grouped-shuffle CPFI, and consensus selection procedure are implemented in `toniot_ids/xai.py`.

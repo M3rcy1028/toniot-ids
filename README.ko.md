@@ -161,7 +161,7 @@ Validation set에서 **직전 단계 모델**과 비교한다. 허용 감소 폭
 ### 1. 다운로드와 환경 구성
 
 ```bash
-git clone --branch xai --single-branch --depth 1 https://github.com/M3rcy1028/toniot-ids.git
+git clone https://github.com/M3rcy1028/toniot-ids.git
 cd toniot-ids
 ```
 
@@ -170,7 +170,7 @@ Windows PowerShell:
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-toniot.txt
+python -m pip install -e .
 ```
 
 Python 3.14가 설치된 Linux/macOS:
@@ -178,10 +178,12 @@ Python 3.14가 설치된 Linux/macOS:
 ```bash
 python3.14 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements-toniot.txt
+python -m pip install -e .
 ```
 
 모델 로딩·추론 환경은 **CPython 3.14.4**이며, 의존성 버전은 `requirements-toniot.txt`로 관리한다.
+
+전체 명령은 `python -m toniot_ids --help`로 확인한다. 설치 후에는 같은 명령을 `toniot-ids`로도 실행할 수 있다.
 
 | 패키지 | 버전 | 패키지 | 버전 |
 | --- | --- | --- | --- |
@@ -220,23 +222,23 @@ print(pd.DataFrame({"label": labels, "confidence": probabilities.max(axis=1)}))
 
 ```bash
 # XAI 분석을 제외한 baseline 학습·평가
-python -c "from experiment import run_lightgbm_pipeline; run_lightgbm_pipeline(save_results=True, feature_selection=False, run_xai=False)"
+python -m toniot_ids baseline --no-xai
 
-# 직전 단계의 결과를 사용하므로 아래 순서로 실행
-python run_reduction_1.py
-python run_reduction_2.py
-python run_reduction_3.py
+# 모든 축소 단계를 순서대로 실행
+python -m toniot_ids reduce all
 ```
 
-각 단계는 프로세스 시작일에 해당하는 결과 폴더를 참조하므로 같은 날짜에 순서대로 실행한다. 본 문서의 실험 결과는 `reports/lightgbm_260805/`에 있다.
+`reduce all`은 한 프로세스에서 단계를 순서대로 실행하고, 검증 조건을 통과하지 못한 후보에서 종료한다. 개별 단계는 `reduce 1`, `reduce 2`, `reduce 3`으로 실행한다. 별도로 실행한 프로세스는 실행일 기준 결과 폴더를 참조한다. 본 문서의 실험 결과는 `reports/lightgbm_260805/`에 있다.
+
+다른 디렉터리의 데이터와 출력 경로를 사용하려면 `python -m toniot_ids --workspace /path/to/experiment baseline --no-xai`로 실행한다. 해당 경로의 `data_network/`를 읽고 `models/`·`reports/`에 결과를 생성한다.
 
 전처리 CSV가 있으면 재사용한다. Raw CSV부터 전처리를 다시 실행하려면 다음 명령을 사용한다.
 
 ```bash
-python -c "from toniot_dataset import ensure_raw_dataset, preprocess_dataset; ensure_raw_dataset(); preprocess_dataset()"
+python -m toniot_ids preprocess
 ```
 
-Raw CSV가 없으면 `ensure_raw_dataset()`이 Kaggle 미러에서 다운로드한다. Kaggle 인증은 로컬 환경에 설정한다. `python run.py`의 기본 동작은 baseline 학습과 XAI 분석이며, XAI 분석을 끌 때는 위의 `run_xai=False` 호출을 사용한다.
+Raw CSV가 없으면 Kaggle 미러에서 다운로드한다. Kaggle 인증은 로컬 환경에 설정한다. `baseline`은 기본적으로 XAI 분석을 포함하며, `--no-xai`로 baseline만 학습한다. `baseline --features path/to/features.csv`는 `feature` column의 목록을 입력으로 사용한다. 통계 분석은 `python -m toniot_ids analyze`로 실행한다.
 
 ### 4. 결과 검증과 시각화
 
@@ -248,17 +250,20 @@ python docs/tools/build_readme_assets.py
 
 ## 모델 설정과 파일 구성
 
-Multiclass GBDT, 최대 3,000 boosting rounds, learning rate `0.05`, `num_leaves=31`, `max_depth=15`, `colsample_bytree=0.8`, random seed `42`, CPU thread `8`을 사용한다. Validation `multi_logloss`를 기준으로 early stopping patience `50`을 적용한다. Row bagging 설정은 `subsample=0.8`, `subsample_freq=0`이다. 전체 설정: [`lightgbm_model.py`](lightgbm_model.py)
+Multiclass GBDT, 최대 3,000 boosting rounds, learning rate `0.05`, `num_leaves=31`, `max_depth=15`, `colsample_bytree=0.8`, random seed `42`, CPU thread `8`을 사용한다. Validation `multi_logloss`를 기준으로 early stopping patience `50`을 적용한다. Row bagging 설정은 `subsample=0.8`, `subsample_freq=0`이다. 전체 설정: [`toniot_ids/model.py`](toniot_ids/model.py)
 
 ```text
 toniot-ids/
-├── toniot_dataset.py        # 다운로드, 분할, 인코딩, 스케일링
-├── lightgbm_model.py        # LightGBM 생성, 학습, 저장
-├── experiment.py           # Baseline, 축소 실험, 채택 조건, 평가
-├── xai.py                  # Feature importance, interaction, consensus selection
-├── run.py                  # 학습 실행
-├── run_reduction_{1,2,3}.py  # 단계별 축소 실험
-├── requirements-toniot.txt  # 고정 의존성 버전
+├── pyproject.toml          # 패키지와 CLI 설치 설정
+├── requirements-toniot.txt # 고정 의존성 버전
+├── toniot_ids/
+│   ├── cli.py              # preprocess / analyze / baseline / reduce
+│   ├── data.py             # 다운로드, 분할, 인코딩, 스케일링
+│   ├── model.py            # LightGBM 생성, 학습, 저장
+│   ├── experiments.py      # Baseline, 축소 실험, 채택 조건, 평가
+│   └── xai.py              # Feature importance와 consensus selection
+├── experiments/telemetry/  # 별도 센서 데이터 전처리 실험
+├── tests/                  # CLI 통합 테스트
 ├── data_network/           # Network CSV와 전처리 데이터
 ├── data_iot/               # IoT telemetry 실험 데이터
 ├── models/                 # 학습된 모델
@@ -271,6 +276,8 @@ toniot-ids/
 ```
 
 Network 실험은 `data_network/processed_type`을 사용한다. 날짜별 로그와 실험 노트는 [`docs/experiments/`](docs/experiments/README.md), 상세 pipeline은 [`docs/figures/`](docs/figures/README.md)에 정리하였다.
+
+통합 테스트는 `python -m unittest discover -s tests -v`로 실행한다. 작은 fixture를 전처리하고 실제 LightGBM을 학습한 뒤, 임시 workspace에서 모델 파일과 예측 결과를 확인한다.
 
 ## 참고 자료와 연계 구현
 

@@ -10,9 +10,10 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 # UNSW TON_IoT Train_Test_IoT_dataset 전처리 코드
 # ============================================================
 
-RAW_DATA_DIR = Path("data")
-REPORT_ROOT_DIR = Path("reports/ton_iot_analysis")
-PROCESSED_ROOT_DIR = Path("data/processed_iot")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+RAW_DATA_DIR = REPOSITORY_ROOT / "data_iot/raw"
+REPORT_ROOT_DIR = REPOSITORY_ROOT / "reports/ton_iot_analysis"
+PROCESSED_ROOT_DIR = REPOSITORY_ROOT / "data_iot/processed_iot"
 
 TARGET_COLUMN = "type"
 

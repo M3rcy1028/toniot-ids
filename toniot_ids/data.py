@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 import pandas as pd
@@ -87,15 +86,6 @@ def ensure_raw_dataset():
 '''
     데이터셋 분석하는 코드
 '''
-
-def load_dataset(csv_path: Path) -> pd.DataFrame:
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Dataset not found: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-    print(f"[INFO] Dataset loaded: {csv_path}")
-    return df
-
 
 def print_basic_info(df: pd.DataFrame) -> None:
     print("\n========== Basic Info ==========")
@@ -259,7 +249,6 @@ def analyze_toniot():
     데이터셋 전처리
 '''
 
-DATA_PATH = Path("data_network/raw/train_test_network.csv")
 OUTPUT_DIR = Path("data_network/processed_type")
 
 TARGET_COLUMN = "type"
