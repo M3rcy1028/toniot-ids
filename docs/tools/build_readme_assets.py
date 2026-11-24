@@ -16,7 +16,7 @@ from collections import Counter
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-SOURCE_COMMIT = "c8cc8596f22900d994eca525878c8c674e2e98e4"
+SOURCE_COMMIT = "8746a41f0f3b39420532a84de83bfe6b9f5e6c02"
 CLASSES = ["backdoor", "ddos", "dos", "injection", "mitm", "normal", "password", "ransomware", "scanning", "xss"]
 REPORT = Path("reports/lightgbm_260805")
 STAGES = [("baseline", 22, "", "lightgbm_toniot_classification.pkl"),
