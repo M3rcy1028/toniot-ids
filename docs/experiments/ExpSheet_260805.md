@@ -392,7 +392,7 @@
 ### 변경 사항
 
 - 데이터 전처리부터 reduction-2까지의 전체 학습·XAI·피처 선택 과정을 하나의 SVG 다이어그램으로 작성했다.
-- `figs/` 디렉터리를 새로 만들고 다이어그램과 Markdown 미리보기 문서를 저장했다.
+- `docs/figures/`에 다이어그램과 Markdown 미리보기 문서를 정리했다.
 
 ### 다이어그램 포함 범위
 
@@ -406,9 +406,9 @@
 
 ### 생성 결과
 
-- SVG: `figs/toniot_training_feature_extraction_pipeline.svg`
-- PNG: `figs/toniot_training_feature_extraction_pipeline.png`
-- 미리보기: `figs/README.md`
+- SVG: `docs/figures/toniot_training_feature_extraction_pipeline.svg`
+- PNG: `docs/figures/toniot_training_feature_extraction_pipeline.png`
+- 미리보기: `docs/figures/README.md`
 - SVG XML parsing 및 크기 검증을 통과했다.
 - headless browser로 PNG 렌더링 후 전체 레이아웃을 확인했으며 내용 잘림이나 박스 겹침이 없음을 확인했다.
 
@@ -459,7 +459,7 @@
 
 ### 생성 결과
 
-- `260805_baseline_vs_reduction_1.txt`에 원본 22-feature 모델과 Reduction-1 18-feature 모델의 비교를 작성했다.
+- `docs/experiments/logs/260805_baseline_vs_reduction_1.txt`에 원본 22-feature 모델과 Reduction-1 18-feature 모델의 비교를 작성했다.
 - 비교 범위: feature 구성, validation/test 전체 지표, MITM/Normal 클래스, 모델 크기, best iteration, 추론 시간 및 처리량
 
 ### 핵심 비교

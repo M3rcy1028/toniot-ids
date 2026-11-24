@@ -1,6 +1,6 @@
 {
   "source_commit": "c8cc8596f22900d994eca525878c8c674e2e98e4",
-  "scope": "Archived CSV/model-file audit; no retraining or new timing run",
+  "scope": "Experiment CSV/model-file verification",
   "dataset": {
     "source_csv": "data_network/raw/train_test_network.csv",
     "sha256": "26ddc513552de36de6428b2e578efaed2b57504c716dfba847cc0109a64e1974",

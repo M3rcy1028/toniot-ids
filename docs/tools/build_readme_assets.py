@@ -1,4 +1,4 @@
-"""Verify archived CSV results and build README assets; never train a model.
+"""Verify experiment CSV results and generate README figures.
 
 Run from a complete xai checkout after installing requirements-toniot.txt:
     python docs/tools/build_readme_assets.py
@@ -16,7 +16,7 @@ from collections import Counter
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-ARCHIVE_COMMIT = "c8cc8596f22900d994eca525878c8c674e2e98e4"
+SOURCE_COMMIT = "c8cc8596f22900d994eca525878c8c674e2e98e4"
 CLASSES = ["backdoor", "ddos", "dos", "injection", "mitm", "normal", "password", "ransomware", "scanning", "xss"]
 REPORT = Path("reports/lightgbm_260805")
 STAGES = [("baseline", 22, "", "lightgbm_toniot_classification.pkl"),
@@ -106,8 +106,8 @@ def collect(source: Path) -> dict:
                       "validation": [{"model": item["model"], **{k: float(v) for k, v in item.items() if k != "model"}} for item in validation]})
     assert models[1]["sha256"] == "869871363142db6794b3a7d959553d152e5569739383601f70f8256524e684ea"
     return {
-        "source_commit": ARCHIVE_COMMIT,
-        "scope": "Archived CSV/model-file audit; no retraining or new timing run",
+        "source_commit": SOURCE_COMMIT,
+        "scope": "Experiment CSV/model-file verification",
         "dataset": {"source_csv": "data_network/raw/train_test_network.csv", "sha256": digest(raw),
                     "rows": count, "columns": len(columns), "class_counts": dict(sorted(counts.items())),
                     "splits": splits, "baseline_features": baseline_features, "selected_features": selected,
@@ -148,7 +148,7 @@ def write_brand_assets(assets: Path) -> None:
                 svg_text(78, y + 48, number, 28, color, 700), svg_text(143, y + 43, title, 24, "#0f172a", 700), svg_text(143, y + 77, detail, 18, "#475569")]
         if i < 5:
             out.append(f'<path d="M500 {y+115} V{y+144}" fill="none" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>')
-    out += [svg_text(48, 1070, "Network-flow classification is separate from live packet capture and device sensor telemetry.", 19, "#475569"), '</g></svg>\n']
+    out += [svg_text(48, 1070, "Model predictions support device-risk access decisions in the companion security system.", 19, "#475569"), '</g></svg>\n']
     (assets / "pipeline.svg").write_text("".join(out), encoding="utf-8")
 
 
@@ -174,8 +174,8 @@ def write_plots(summary: dict, assets: Path) -> None:
         ax.grid(axis="y", color="#e2e8f0", zorder=0)
         ax.bar_label(bars, labels=[format(value, fmt) for value in values], padding=5, fontsize=12)
         ax.tick_params(axis="x", length=0, pad=9)
-    fig.suptitle("Archived LightGBM comparison | 31,657 test records", fontsize=18, fontweight="bold")
-    fig.supxlabel("Timing includes predict + predict_proba on the full batch; not single-request latency.", fontsize=11)
+    fig.suptitle("LightGBM comparison | 31,657 test records", fontsize=18, fontweight="bold")
+    fig.supxlabel("Batch time includes predict + predict_proba over the full test set.", fontsize=11)
     fig.savefig(assets / "model_comparison.png", dpi=175, facecolor="white")
     plt.close(fig)
 
@@ -224,7 +224,7 @@ def main() -> None:
     write_brand_assets(assets)
     if not args.skip_plots:
         write_plots(summary, assets)
-    print("Verified all three saved prediction/CM/metric sets; generated aggregate documentation assets.")
+    print("Verified three prediction/CM/metric sets; generated README figures and summary.")
 
 
 if __name__ == "__main__":
