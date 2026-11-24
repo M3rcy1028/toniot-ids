@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toniot-ids"
+version = "0.1.0"
+description = "LightGBM intrusion detection with class-aware XAI feature selection"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dynamic = ["dependencies"]
+
+[project.scripts]
+toniot-ids = "toniot_ids.cli:main"
+
+[project.urls]
+Repository = "https://github.com/M3rcy1028/toniot-ids"
+
+[tool.setuptools.packages.find]
+include = ["toniot_ids*"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements-toniot.txt"]}

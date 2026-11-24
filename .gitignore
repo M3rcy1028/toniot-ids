@@ -12,3 +12,6 @@ secrets/
 .ipynb_checkpoints/
 .DS_Store
 Thumbs.db
+*.egg-info/
+build/
+dist/
